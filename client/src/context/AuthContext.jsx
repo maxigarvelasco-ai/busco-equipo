@@ -26,44 +26,60 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // Safety timeout - ALWAYS unlock after 3 seconds no matter what
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
 
-    async function initializeAuth() {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        if (!mountedRef.current) return;
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Error fetching initial session:', err);
-        if (mountedRef.current) setLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setProfile(data);
+            setLoading(false);
+            clearTimeout(timeout);
+          })
+          .catch(() => {
+            setLoading(false);
+            clearTimeout(timeout);
+          });
+      } else {
+        setLoading(false);
+        clearTimeout(timeout);
       }
-    }
+    }).catch(() => {
+      setLoading(false);
+      clearTimeout(timeout);
+    });
 
-    initializeAuth();
-
-    // Listen for auth changes after initialization
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mountedRef.current) return;
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+            .then(({ data }) => {
+              if (data) setProfile(data);
+            });
         } else {
           setProfile(null);
-          setLoading(false);
         }
       }
     );
 
     return () => {
       subscription.unsubscribe();
+      clearTimeout(timeout);
     };
   }, []);
 
