@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../services/supabaseClient';
 import { matchesAPI } from '../services/api';
 import MatchCard from '../components/MatchCard';
 import { useNavigate } from 'react-router-dom';
