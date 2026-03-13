@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
 import { matchesAPI } from '../services/api';
@@ -16,40 +16,28 @@ export default function Feed() {
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [toast, setToast] = useState(null);
 
+  const loadMatches = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const { data, error: err } = await supabase
+        .from("matches")
+        .select("*")
+        .order("date", { ascending: true });
+
+      if (err) throw err;
+      setMatches(data || []);
+      setError(null);
+    } catch (err) {
+      console.error("Error loading matches:", err);
+      setError("No se pudieron cargar los partidos.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    let isMounted = true; // Evita actualizar el estado si el componente se desmonta
-
-    const loadMatches = async () => {
-      try {
-        setIsLoading(true);
-        const { data, error: err } = await supabase
-          .from("matches")
-          .select("*")
-          .order("date", { ascending: true });
-
-        if (err) throw err;
-        
-        if (isMounted) {
-          setMatches(data || []);
-          setError(null);
-        }
-      } catch (err) {
-        console.error("Error loading matches:", err);
-        if (isMounted) setError("No se pudieron cargar los equipos.");
-      } finally {
-        if (isMounted) setIsLoading(false); // ESTO APAGA EL SPINNER SIEMPRE
-      }
-    };
-
     loadMatches();
-
-    return () => {
-      isMounted = false; // Limpieza al desmontar
-    };
-  }, []); // ARRAY VACÍO: Solo se ejecuta una vez
-
-  const loadMatches = () => {}; // dummy to avoid breaking handleJoin/handleLeave for now, though we should likely refactor them not to call loadMatches directly anymore, or just leave it empty and let them rely on optimisic updates or page reloads later.
-
+  }, [loadMatches]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
