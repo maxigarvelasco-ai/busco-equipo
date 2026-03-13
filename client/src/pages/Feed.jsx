@@ -16,14 +16,17 @@ export default function Feed() {
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [toast, setToast] = useState(null);
 
-  const loadMatches = useCallback(async () => {
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  const loadMatches = useCallback(async (showSpinner = false) => {
     try {
-      setIsLoading(true);
+      if (showSpinner) setIsLoading(true);
+      
       const { data, error: err } = await supabase
         .from("matches")
         .select("*")
         .order("match_date", { ascending: true });
-
+      
       if (err) throw err;
       setMatches(data || []);
       setError(null);
@@ -32,11 +35,12 @@ export default function Feed() {
       setError("No se pudieron cargar los partidos.");
     } finally {
       setIsLoading(false);
+      setInitialLoad(false);
     }
   }, []);
 
   useEffect(() => {
-    loadMatches();
+    loadMatches(true); // solo la primera vez muestra spinner
   }, [loadMatches]);
 
   const showToast = (message, type = 'success') => {
@@ -49,7 +53,7 @@ export default function Feed() {
     try {
       await matchesAPI.requestJoin(matchId);
       showToast('¡Solicitud enviada! 🎉');
-      loadMatches();
+      loadMatches(false); // recarga silenciosa
     } catch (err) {
       showToast(err.message || 'Error al solicitar unirse', 'error');
     }
@@ -59,7 +63,7 @@ export default function Feed() {
     try {
       await matchesAPI.leave(matchId);
       showToast('Saliste del partido');
-      loadMatches();
+      loadMatches(false); // recarga silenciosa
     } catch (err) {
       showToast(err.message || 'Error al salir', 'error');
     }
