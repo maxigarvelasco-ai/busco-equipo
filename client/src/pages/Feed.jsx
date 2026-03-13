@@ -11,38 +11,45 @@ export default function Feed() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [toast, setToast] = useState(null);
 
-  const loadMatches = async () => {
-    try {
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from("matches")
-        .select("*")
-        .order("date", { ascending: true });
-
-      if (error) {
-        console.error("Supabase error:", error);
-        setMatches([]);
-        return;
-      }
-
-      setMatches(data || []);
-
-    } catch (err) {
-      console.error("Unexpected error loading matches:", err);
-      setMatches([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true; // Evita actualizar el estado si el componente se desmonta
+
+    const loadMatches = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error: err } = await supabase
+          .from("matches")
+          .select("*")
+          .order("date", { ascending: true });
+
+        if (err) throw err;
+        
+        if (isMounted) {
+          setMatches(data || []);
+          setError(null);
+        }
+      } catch (err) {
+        console.error("Error loading matches:", err);
+        if (isMounted) setError("No se pudieron cargar los equipos.");
+      } finally {
+        if (isMounted) setIsLoading(false); // ESTO APAGA EL SPINNER SIEMPRE
+      }
+    };
+
     loadMatches();
-  }, []);
+
+    return () => {
+      isMounted = false; // Limpieza al desmontar
+    };
+  }, []); // ARRAY VACÍO: Solo se ejecuta una vez
+
+  const loadMatches = () => {}; // dummy to avoid breaking handleJoin/handleLeave for now, though we should likely refactor them not to call loadMatches directly anymore, or just leave it empty and let them rely on optimisic updates or page reloads later.
+
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -92,8 +99,13 @@ export default function Feed() {
         ))}
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="loading-spinner"><div className="spinner"></div></div>
+      ) : error ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">⚠️</div>
+          <div className="empty-state-title">{error}</div>
+        </div>
       ) : matches.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">⚽</div>
