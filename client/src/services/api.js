@@ -397,7 +397,7 @@ export const clubsAPI = {
   async getAll() {
     const { data, error } = await supabase
       .from('clubs')
-      .select('*, profiles:creator_id(name)')
+      .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
@@ -406,7 +406,7 @@ export const clubsAPI = {
   async getById(id) {
     const { data, error } = await supabase
       .from('clubs')
-      .select('*, profiles:creator_id(name)')
+      .select('*')
       .eq('id', id)
       .single();
     if (error) throw error;
