@@ -30,31 +30,27 @@ function GuestRoute({ children }) {
 }
 
 function AppRoutes() {
+  const { loading } = useAuth();
+  
+  if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;
+
   return (
     <div className="app-layout">
       <Routes>
         <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
-        <Route path="/*" element={
-          <>
-            <TopHeader />
-            <Routes>
-              <Route path="/" element={<Feed />} />
-              <Route path="/match/:id" element={<MatchDetail />} />
-              <Route path="/create-match" element={<ProtectedRoute><CreateMatch /></ProtectedRoute>} />
-              <Route path="/venues" element={<Venues />} />
-              <Route path="/fields" element={<Fields />} />
-              <Route path="/clubs" element={<Clubs />} />
-              <Route path="/clubs/:id" element={<ClubDetail />} />
-              <Route path="/tournaments" element={<Tournaments />} />
-              <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-              <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
-            </Routes>
-            <Navbar />
-          </>
-        } />
+        <Route path="/" element={<><TopHeader /><Feed /><Navbar /></>} />
+        <Route path="/match/:id" element={<><TopHeader /><MatchDetail /><Navbar /></>} />
+        <Route path="/create-match" element={<><TopHeader /><ProtectedRoute><CreateMatch /></ProtectedRoute><Navbar /></>} />
+        <Route path="/venues" element={<><TopHeader /><Venues /><Navbar /></>} />
+        <Route path="/fields" element={<><TopHeader /><Fields /><Navbar /></>} />
+        <Route path="/clubs" element={<><TopHeader /><Clubs /><Navbar /></>} />
+        <Route path="/clubs/:id" element={<><TopHeader /><ClubDetail /><Navbar /></>} />
+        <Route path="/tournaments" element={<><TopHeader /><Tournaments /><Navbar /></>} />
+        <Route path="/subscription" element={<><TopHeader /><ProtectedRoute><Subscription /></ProtectedRoute><Navbar /></>} />
+        <Route path="/profile" element={<><TopHeader /><ProtectedRoute><Profile /></ProtectedRoute><Navbar /></>} />
+        <Route path="/notifications" element={<><TopHeader /><ProtectedRoute><Notifications /></ProtectedRoute><Navbar /></>} />
+        <Route path="/support" element={<><TopHeader /><ProtectedRoute><Support /></ProtectedRoute><Navbar /></>} />
       </Routes>
     </div>
   );
