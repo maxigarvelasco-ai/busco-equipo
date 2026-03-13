@@ -15,35 +15,20 @@ export default function Feed() {
   const [toast, setToast] = useState(null);
 
   const loadMatches = useCallback(async () => {
-    // Prevent multiple simultaneous fetches
-    setLoading(true);
-    
-    // Create an AbortController for the 5-second timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
     try {
+      setLoading(true);
+      
       const filters = {};
       if (selectedArea !== 'Todas') filters.zone = selectedArea;
       
-      // We pass the controller signal if the api supports it, 
-      // but to be safe we'll use Promise.race to enforce the timeout on the client side
-      const fetchPromise = matchesAPI.getAll(filters, user?.id);
+      // We directly query the matchesAPI without any timeouts or Promise.race
+      const data = await matchesAPI.getAll(filters, user?.id);
       
-      // Create a timeout promise that rejects after 5 seconds
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 5000);
-      });
-
-      // Race the fetch against the timeout
-      const data = await Promise.race([fetchPromise, timeoutPromise]);
       setMatches(data || []);
     } catch (err) {
       console.error('Error fetching matches:', err);
-      // Even on error, we ensure we return an empty array to stop the loading state gracefully
       setMatches([]);
     } finally {
-      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [selectedArea, user?.id]);
