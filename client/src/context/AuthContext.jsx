@@ -10,24 +10,33 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setLoading(false);
+    }, 5000); // 5 second max wait
+    
+    return () => clearTimeout(timeout);
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
-    // Use a single async function to initialize to avoid race conditions
     async function initializeAuth() {
       try {
+        // First let onAuthStateChange handle the OAuth callback
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
         
         if (!mounted) return;
         
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        } else {
+        // If no session yet, onAuthStateChange will handle it
+        if (!session) {
           setLoading(false);
+          return;
         }
+        
+        setSession(session);
+        setUser(session.user);
+        await fetchProfile(session.user.id);
       } catch (err) {
         console.error('Error fetching initial session:', err);
         if (mounted) setLoading(false);
