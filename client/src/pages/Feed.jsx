@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabaseClient';
 import { matchesAPI } from '../services/api';
 import MatchCard from '../components/MatchCard';
 import { useNavigate } from 'react-router-dom';
@@ -14,42 +15,39 @@ export default function Feed() {
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [toast, setToast] = useState(null);
 
-  const loadMatches = useCallback(async () => {
+  const loadMatches = async () => {
     try {
       setLoading(true);
-      
-      const filters = {};
-      if (selectedArea !== 'Todas') filters.zone = selectedArea;
-      
-      // We directly query the matchesAPI without any timeouts or Promise.race
-      const data = await matchesAPI.getAll(filters, user?.id);
-      
+
+      const { data, error } = await supabase
+        .from('matches')
+        .select('*')
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+
       setMatches(data || []);
     } catch (err) {
-      console.error('Error fetching matches:', err);
+      console.error('Error loading matches:', err);
       setMatches([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedArea, user?.id]);
+  };
 
   useEffect(() => {
-    // Initial load
     loadMatches();
 
-    // Reload on focus
-    const handleFocus = () => {
-      console.log("Window focused, reloading matches...");
+    const reloadMatches = () => {
       loadMatches();
     };
 
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('focus', reloadMatches);
 
-    // Cleanup listener on unmount
     return () => {
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', reloadMatches);
     };
-  }, [loadMatches]);
+  }, []);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
