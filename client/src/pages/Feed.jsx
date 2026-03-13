@@ -14,22 +14,57 @@ export default function Feed() {
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [toast, setToast] = useState(null);
 
-  const fetchMatches = useCallback(async () => {
+  const loadMatches = useCallback(async () => {
+    // Prevent multiple simultaneous fetches
+    setLoading(true);
+    
+    // Create an AbortController for the 5-second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     try {
-      setLoading(true);
       const filters = {};
       if (selectedArea !== 'Todas') filters.zone = selectedArea;
-      const data = await matchesAPI.getAll(filters, user?.id);
-      setMatches(data);
+      
+      // We pass the controller signal if the api supports it, 
+      // but to be safe we'll use Promise.race to enforce the timeout on the client side
+      const fetchPromise = matchesAPI.getAll(filters, user?.id);
+      
+      // Create a timeout promise that rejects after 5 seconds
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 5000);
+      });
+
+      // Race the fetch against the timeout
+      const data = await Promise.race([fetchPromise, timeoutPromise]);
+      setMatches(data || []);
     } catch (err) {
       console.error('Error fetching matches:', err);
+      // Even on error, we ensure we return an empty array to stop the loading state gracefully
       setMatches([]);
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [selectedArea, user?.id]);
 
-  useEffect(() => { fetchMatches(); }, [fetchMatches]);
+  useEffect(() => {
+    // Initial load
+    loadMatches();
+
+    // Reload on focus
+    const handleFocus = () => {
+      console.log("Window focused, reloading matches...");
+      loadMatches();
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    // Cleanup listener on unmount
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadMatches]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -41,7 +76,7 @@ export default function Feed() {
     try {
       await matchesAPI.requestJoin(matchId);
       showToast('¡Solicitud enviada! 🎉');
-      fetchMatches();
+      loadMatches();
     } catch (err) {
       showToast(err.message || 'Error al solicitar unirse', 'error');
     }
@@ -51,7 +86,7 @@ export default function Feed() {
     try {
       await matchesAPI.leave(matchId);
       showToast('Saliste del partido');
-      fetchMatches();
+      loadMatches();
     } catch (err) {
       showToast(err.message || 'Error al salir', 'error');
     }
