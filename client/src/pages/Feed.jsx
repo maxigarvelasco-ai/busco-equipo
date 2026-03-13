@@ -22,7 +22,7 @@ export default function Feed() {
       const { data, error: err } = await supabase
         .from("matches")
         .select("*")
-        .order("date", { ascending: true });
+        .order("match_date", { ascending: true });
 
       if (err) throw err;
       setMatches(data || []);
