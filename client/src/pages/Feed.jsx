@@ -20,15 +20,20 @@ export default function Feed() {
       setLoading(true);
 
       const { data, error } = await supabase
-        .from('matches')
-        .select('*')
-        .order('date', { ascending: true });
+        .from("matches")
+        .select("*")
+        .order("date", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        setMatches([]);
+        return;
+      }
 
       setMatches(data || []);
+
     } catch (err) {
-      console.error('Error loading matches:', err);
+      console.error("Unexpected error loading matches:", err);
       setMatches([]);
     } finally {
       setLoading(false);
@@ -37,16 +42,6 @@ export default function Feed() {
 
   useEffect(() => {
     loadMatches();
-
-    const reloadMatches = () => {
-      loadMatches();
-    };
-
-    window.addEventListener('focus', reloadMatches);
-
-    return () => {
-      window.removeEventListener('focus', reloadMatches);
-    };
   }, []);
 
   const showToast = (message, type = 'success') => {
