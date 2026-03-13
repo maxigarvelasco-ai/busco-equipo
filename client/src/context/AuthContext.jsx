@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
@@ -9,37 +9,39 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     const timeout = setTimeout(() => {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }, 5000); // 5 second max wait
     
     return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
-    let mounted = true;
 
     async function initializeAuth() {
       try {
-        // First let onAuthStateChange handle the OAuth callback
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
-        
-        if (!mounted) return;
-        
-        // If no session yet, onAuthStateChange will handle it
-        if (!session) {
-          setLoading(false);
-          return;
-        }
-        
+        if (!mountedRef.current) return;
         setSession(session);
-        setUser(session.user);
-        await fetchProfile(session.user.id);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          await fetchProfile(session.user.id);
+        } else {
+          setLoading(false);
+        }
       } catch (err) {
         console.error('Error fetching initial session:', err);
-        if (mounted) setLoading(false);
+        if (mountedRef.current) setLoading(false);
       }
     }
 
@@ -48,7 +50,7 @@ export function AuthProvider({ children }) {
     // Listen for auth changes after initialization
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (!mounted) return;
+        if (!mountedRef.current) return;
         setSession(session);
         setUser(session?.user ?? null);
         if (session?.user) {
@@ -61,7 +63,6 @@ export function AuthProvider({ children }) {
     );
 
     return () => {
-      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
@@ -73,14 +74,13 @@ export function AuthProvider({ children }) {
         .select('*')
         .eq('id', userId)
         .single();
-
-      if (!error && data) {
+      if (!error && data && mountedRef.current) {
         setProfile(data);
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false); // ALWAYS runs, no matter what
     }
   }
 
