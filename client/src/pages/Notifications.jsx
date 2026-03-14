@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, matchesAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 // Icons for different notification types
@@ -28,6 +28,7 @@ const notificationIcons = {
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [processingNotifId, setProcessingNotifId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,26 +48,59 @@ export default function Notifications() {
   };
 
   const handleNotificationClick = async (notif) => {
-    if (!notif.is_read) {
-      await notificationsAPI.markAsRead(notif.id);
-    }
-
-    let path = null;
-    if (notif.data) {
-        if (typeof notif.data === 'string' && notif.data.startsWith('/')) {
-            path = notif.data;
-        } else if (typeof notif.data === 'object' && notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) {
-            path = notif.data.path;
-        }
-    }
-
-    if (path) {
-      // If it's a join request, navigate to the match detail page and open the requests tab
-      if (notif.type === 'join_request_received') {
-        navigate(path, { state: { openTab: 'requests' } });
-      } else {
+    // For notifications without actions, navigate
+    if (notif.type !== 'join_request_received') {
+      if (!notif.is_read) {
+        await notificationsAPI.markAsRead(notif.id);
+      }
+      let path = null;
+      if (notif.data) {
+          if (typeof notif.data === 'string' && notif.data.startsWith('/')) {
+              path = notif.data;
+          } else if (typeof notif.data === 'object' && notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) {
+              path = notif.data.path;
+          }
+      }
+      if (path) {
         navigate(path);
       }
+    }
+    // For join requests, the action is handled by buttons, but we can still mark as read on click
+    else if (!notif.is_read) {
+       await notificationsAPI.markAsRead(notif.id);
+       setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+    }
+  };
+
+  const handleRequestAction = async (notif, action) => {
+    // The 'data' field for a join request should contain requestId, matchId, and userId
+    // This is an assumption based on the API. If this is not the case, this will fail.
+    const { requestId, matchId, userId } = notif.data;
+
+    if (!requestId || !matchId || !userId) {
+      console.error('Notification data is missing required fields for this action.', notif.data);
+      return;
+    }
+
+    setProcessingNotifId(notif.id);
+    try {
+      if (action === 'accept') {
+        await matchesAPI.approveRequest(requestId, matchId, userId);
+      } else {
+        await matchesAPI.rejectRequest(requestId, matchId, userId);
+      }
+      // Optimistically hide the actions and mark as read
+      setNotifications(notifications.map(n => 
+        n.id === notif.id 
+        ? { ...n, is_read: true, handled: true } 
+        : n
+      ));
+    } catch (err) {
+      console.error(`Failed to ${action} request`, err);
+    } finally {
+      setProcessingNotifId(null);
+      // Optionally, you could reload all notifications here with loadNotifications()
+      // but optimistic update is faster.
     }
   };
 
@@ -105,6 +139,29 @@ export default function Notifications() {
                 <span className="notification-date">
                   {new Date(notif.created_at).toLocaleString()}
                 </span>
+                
+                {notif.type === 'join_request_received' && !notif.handled && typeof notif.data === 'object' && (
+                  <div className="notification-actions">
+                    {processingNotifId === notif.id ? (
+                      <div className="spinner-sm"></div>
+                    ) : (
+                      <>
+                        <button 
+                          className="btn btn-sm btn-primary" 
+                          onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'accept'); }}
+                        >
+                          Aceptar
+                        </button>
+                        <button 
+                          className="btn btn-sm btn-danger" 
+                          onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'reject'); }}
+                        >
+                          Rechazar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
