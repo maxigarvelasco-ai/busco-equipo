@@ -50,12 +50,22 @@ export default function Notifications() {
     if (!notif.is_read) {
       await notificationsAPI.markAsRead(notif.id);
     }
-    if (notif.data && typeof notif.data === 'string' && notif.data.startsWith('/')) {
+
+    let path = null;
+    if (notif.data) {
+        if (typeof notif.data === 'string' && notif.data.startsWith('/')) {
+            path = notif.data;
+        } else if (typeof notif.data === 'object' && notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) {
+            path = notif.data.path;
+        }
+    }
+
+    if (path) {
       // If it's a join request, navigate to the match detail page and open the requests tab
       if (notif.type === 'join_request_received') {
-        navigate(notif.data, { state: { openTab: 'requests' } });
+        navigate(path, { state: { openTab: 'requests' } });
       } else {
-        navigate(notif.data);
+        navigate(path);
       }
     }
   };
