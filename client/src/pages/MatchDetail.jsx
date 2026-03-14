@@ -13,6 +13,8 @@ export default function MatchDetail() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [joinRequests, setJoinRequests] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [hasRequested, setHasRequested] = useState(false);
   const [activeTab, setActiveTab] = useState('info'); // info, chat, requests
   const [loading, setLoading] = useState(true);
 
@@ -37,6 +39,8 @@ export default function MatchDetail() {
 
       if (currentMatch) {
         await loadMessages();
+        await loadPlayers();
+        await checkIfRequested();
         if (currentMatch.creator_id === user?.id) {
           await loadJoinRequests();
         }
@@ -56,6 +60,25 @@ export default function MatchDetail() {
       console.error(err);
     }
   };
+
+  const loadPlayers = async () => {
+    try {
+      const p = await matchesAPI.getPlayers(id);
+      setPlayers(p);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const checkIfRequested = async () => {
+    if (!user) return;
+    try {
+      const reqs = await matchesAPI.getJoinRequests(id);
+      setHasRequested(reqs.some(r => r.user_id === user.id));
+    } catch(err) {
+      console.error(err);
+    }
+  }
 
   const loadJoinRequests = async () => {
     try {
@@ -81,6 +104,7 @@ export default function MatchDetail() {
     try {
       await matchesAPI.approveRequest(reqId, id, userId);
       loadJoinRequests();
+      loadPlayers(); // reload players
       loadMatchData(); // to update player count
     } catch (err) {
       console.error(err);
@@ -161,22 +185,33 @@ export default function MatchDetail() {
 
       {activeTab === 'info' && (
         <div>
-          <h3>Jugadores ({match.players_joined || 0}/{match.max_players})</h3>
-          {/* We would list players here if we fetched match_players details */}
-          <p style={{ color: 'var(--color-text-muted)' }}>Solo el creador puede ver la lista completa en esta versión.</p>
-          
-          {!isCreator && !match.has_joined && (
-             <button className="btn btn-primary" style={{ marginTop: '1rem', width: '100%' }} onClick={async () => {
-               await matchesAPI.requestJoin(match.id);
-               alert('Solicitud enviada');
-             }}>
-               Solicitar Unirse
-             </button>
+          <h3>Jugadores ({players.length}/{match.max_players})</h3>
+          {players.length > 0 ? (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {players.map(p => (
+                <li key={p.user_id} className="card" style={{ marginBottom: '0.5rem', padding: '0.75rem' }}>
+                  <strong>{p.profiles?.name || 'Jugador'}</strong>
+                  {p.profiles?.ranking && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#666' }}>⭐ {p.profiles.ranking}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: 'var(--color-text-muted)' }}>Aún no hay jugadores confirmados.</p>
           )}
-          {match.has_joined && (
-             <button className="btn btn-secondary" style={{ marginTop: '1rem', width: '100%' }}>
-               Ya estás unido
-             </button>
+          
+          {!isCreator && (
+            <button 
+              className="btn btn-primary" 
+              style={{ marginTop: '1rem', width: '100%' }} 
+              onClick={async () => {
+                await matchesAPI.requestJoin(match.id);
+                setHasRequested(true);
+                alert('Solicitud enviada');
+              }}
+              disabled={match.has_joined || hasRequested}
+            >
+              {match.has_joined ? 'Ya estás unido' : (hasRequested ? 'Solicitud pendiente' : 'Solicitar Unirse')}
+            </button>
           )}
         </div>
       )}
@@ -230,7 +265,14 @@ export default function MatchDetail() {
                   {req.profiles?.ranking && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#666' }}>⭐ {req.profiles.ranking}</span>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn btn-sm btn-primary" onClick={() => handleApprove(req.id, req.user_id)}>Aceptar</button>
+                  <button 
+                    className="btn btn-sm btn-primary" 
+                    onClick={() => handleApprove(req.id, req.user_id)}
+                    disabled={players.length >= match.max_players}
+                    title={players.length >= match.max_players ? 'El partido ya está lleno' : 'Aceptar jugador'}
+                  >
+                    Aceptar
+                  </button>
                   <button className="btn btn-sm btn-secondary" onClick={() => handleReject(req.id, req.user_id)}>Rechazar</button>
                 </div>
               </div>

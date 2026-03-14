@@ -114,42 +114,41 @@ export const matchesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { error } = await supabase
-      .from('match_join_requests')
-      .insert({ match_id: matchId, user_id: session.user.id, status: 'pending' });
+    const { error } = await supabase.rpc('request_join_match', { 
+      p_match_id: matchId, 
+      p_user_id: session.user.id 
+    });
     
     if (error) throw error;
   },
 
   // Approve join request
   async approveRequest(requestId, matchId, userId) {
-    // 1. Update request status
-    const { error: updateError } = await supabase
-      .from('match_join_requests')
-      .update({ status: 'approved' })
-      .eq('id', requestId);
-    if (updateError) throw updateError;
-
-    // 2. Add player to match
-    const { error: joinError } = await supabase
-      .from('match_players')
-      .insert({ match_id: matchId, user_id: userId });
-    if (joinError) throw joinError;
-
-    // 3. Create Notification
-    await notificationsAPI.create(userId, 'join_request_approved', `Tu solicitud para unirte al partido ha sido aceptada.`, `/match/${matchId}`);
+    const { error } = await supabase.rpc('accept_match_request', {
+      p_request_id: requestId,
+      p_match_id: matchId,
+      p_user_id: userId,
+    });
+    if (error) throw error;
   },
 
   // Reject join request
   async rejectRequest(requestId, matchId, userId) {
-    const { error } = await supabase
-      .from('match_join_requests')
-      .update({ status: 'rejected' })
-      .eq('id', requestId);
+    const { error } = await supabase.rpc('reject_match_request', {
+      p_request_id: requestId,
+      p_match_id: matchId,
+      p_user_id: userId,
+    });
     if (error) throw error;
+  },
 
-    // Create Notification
-    await notificationsAPI.create(userId, 'join_request_rejected', `Tu solicitud para unirte al partido ha sido rechazada.`, `/match/${matchId}`);
+  async getPlayers(matchId) {
+    const { data, error } = await supabase
+      .from('match_players')
+      .select('*, profiles:user_id(name, avatar_url, ranking)')
+      .eq('match_id', matchId);
+    if (error) throw error;
+    return data || [];
   },
 
   // Leave match (uses RPC function)
