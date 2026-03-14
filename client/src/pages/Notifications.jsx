@@ -2,6 +2,29 @@ import { useState, useEffect } from 'react';
 import { notificationsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
+// Icons for different notification types
+const notificationIcons = {
+  new_chat_message: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+  ),
+  join_request_received: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="8.5" cy="7" r="4"></circle>
+      <line x1="20" y1="8" x2="20" y2="14"></line>
+      <line x1="17" y1="11" x2="23" y2="11"></line>
+    </svg>
+  ),
+  default: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"></path>
+    </svg>
+  )
+};
+
+
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,22 +80,22 @@ export default function Notifications() {
           <div className="empty-state-title">No tienes notificaciones</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="notification-list">
           {notifications.map(notif => (
             <div 
               key={notif.id} 
-              className="card" 
-              style={{ 
-                cursor: notif.data ? 'pointer' : 'default',
-                background: notif.is_read ? 'white' : '#e6fffa',
-                borderLeft: notif.is_read ? 'none' : '4px solid var(--color-primary)'
-              }}
+              className={`notification-item ${notif.is_read ? 'is-read' : ''}`}
               onClick={() => handleNotificationClick(notif)}
             >
-              <p style={{ margin: 0 }}>{notif.content}</p>
-              <span style={{ fontSize: '0.8rem', color: '#888' }}>
-                {new Date(notif.created_at).toLocaleString()}
-              </span>
+              <div className="notification-icon">
+                {notificationIcons[notif.type] || notificationIcons.default}
+              </div>
+              <div className="notification-content">
+                <p>{notif.content}</p>
+                <span className="notification-date">
+                  {new Date(notif.created_at).toLocaleString()}
+                </span>
+              </div>
             </div>
           ))}
         </div>
