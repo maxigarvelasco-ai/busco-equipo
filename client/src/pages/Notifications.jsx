@@ -48,28 +48,33 @@ export default function Notifications() {
   };
 
   const handleNotificationClick = async (notif) => {
-    // Always mark as read on click if it's unread.
-    if (!notif.is_read) {
-      await notificationsAPI.markAsRead(notif.id);
-      setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-    }
-
-    // For informational notifications, no further action is needed on click.
-    if (notif.type === 'new_chat_message' || notif.type === 'join_request_received') {
-      return;
-    }
-
-    // For other notifications, navigate if a path is available.
-    let path = null;
-    if (notif.data) {
-        if (typeof notif.data === 'string' && notif.data.startsWith('/')) {
-            path = notif.data;
-        } else if (typeof notif.data === 'object' && notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) {
-            path = notif.data.path;
+    // For notifications without actions, navigate
+    if (notif.type !== 'join_request_received') {
+      if (!notif.is_read) {
+        await notificationsAPI.markAsRead(notif.id);
+        // Also update the state to show it as read immediately
+        setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
+      }
+      let path = null;
+      if (notif.data) {
+          if (typeof notif.data === 'string' && notif.data.startsWith('/')) {
+              path = notif.data;
+          } else if (typeof notif.data === 'object' && notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) {
+              path = notif.data.path;
+          }
+      }
+      if (path) {
+        if (notif.type === 'new_chat_message') {
+          navigate(path, { state: { openTab: 'chat' } });
+        } else {
+          navigate(path);
         }
+      }
     }
-    if (path) {
-      navigate(path);
+    // For join requests, the action is handled by buttons, but we can still mark as read on click
+    else if (!notif.is_read) {
+       await notificationsAPI.markAsRead(notif.id);
+       setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
     }
   };
 
@@ -114,11 +119,6 @@ export default function Notifications() {
 
   return (
     <div className="page-content">
-      <style>{`
-        .notification-item.no-click-action {
-          cursor: default;
-        }
-      `}</style>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Notificaciones</h1>
         <button className="btn btn-sm btn-secondary" onClick={handleMarkAllRead}>Marcar todas como leídas</button>
@@ -134,7 +134,7 @@ export default function Notifications() {
           {notifications.map(notif => (
             <div 
               key={notif.id} 
-              className={`notification-item ${notif.is_read ? 'is-read' : ''} ${['new_chat_message', 'join_request_received'].includes(notif.type) ? 'no-click-action' : ''}`}
+              className={`notification-item ${notif.is_read ? 'is-read' : ''}`}
               onClick={() => handleNotificationClick(notif)}
             >
               <div className="notification-icon">
