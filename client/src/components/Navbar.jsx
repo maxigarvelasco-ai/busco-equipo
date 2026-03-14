@@ -53,12 +53,9 @@ export default function Navbar() {
         <span>Clubes</span>
       </NavLink>
 
-      <NavLink
-        to={user ? '/profile' : '/login'}
-        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-      >
+      <NavLink to="/notifications" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
         <div style={{ position: 'relative', display: 'inline-block' }}>
-          <span className="nav-icon">👤</span>
+          <span className="nav-icon">🔔</span>
           {unreadCount > 0 && (
             <span style={{
               position: 'absolute', top: -5, right: -10, background: 'red', color: 'white', 
@@ -68,6 +65,14 @@ export default function Navbar() {
             </span>
           )}
         </div>
+        <span>Avisos</span>
+      </NavLink>
+
+      <NavLink
+        to={user ? '/profile' : '/login'}
+        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+      >
+        <span className="nav-icon">👤</span>
         <span>{user ? 'Perfil' : 'Entrar'}</span>
       </NavLink>
     </nav>

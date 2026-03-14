@@ -110,3 +110,50 @@ INSERT INTO app_settings (key, value) VALUES
   ('venue_premium_price', '30000'),
   ('currency', 'ARS')
 ON CONFLICT (key) DO NOTHING;
+
+
+-- =========== NOTIFICACIONES DE CHAT (Añadido por IA) ===========
+-- Por favor, ejecuta este bloque en tu editor SQL de Supabase.
+
+-- 1. Función que se ejecuta cuando se inserta un nuevo mensaje.
+CREATE OR REPLACE FUNCTION public.create_chat_notifications()
+RETURNS TRIGGER AS $$
+DECLARE
+    match_creator_id uuid;
+    match_info RECORD;
+    sender_name TEXT;
+BEGIN
+    -- Obtener información del partido y del creador
+    SELECT m.creator_id, m.zone, p.name INTO match_info
+    FROM public.matches m
+    JOIN public.profiles p ON m.creator_id = p.id
+    WHERE m.id = NEW.match_id;
+
+    -- Obtener el nombre del remitente del mensaje
+    SELECT name INTO sender_name FROM public.profiles WHERE id = NEW.user_id;
+
+    -- Insertar notificaciones para todos los jugadores del partido (excepto el remitente)
+    INSERT INTO public.notifications (user_id, type, content, data)
+    SELECT
+        mp.user_id,
+        'new_chat_message',
+        'Nuevo mensaje de ' || sender_name || ' en el partido en ' || match_info.zone,
+        '/match/' || NEW.match_id
+    FROM
+        public.match_players mp
+    WHERE
+        mp.match_id = NEW.match_id AND mp.user_id != NEW.user_id;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 2. Trigger que llama a la función después de que se inserte un mensaje.
+DROP TRIGGER IF EXISTS trigger_chat_notification ON public.match_messages; -- Opcional: para evitar duplicados si ya existe
+CREATE TRIGGER trigger_chat_notification
+AFTER INSERT ON public.match_messages
+FOR EACH ROW
+EXECUTE FUNCTION public.create_chat_notifications();
+
+-- =================================================================
+

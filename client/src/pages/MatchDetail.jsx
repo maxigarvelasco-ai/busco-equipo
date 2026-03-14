@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { matchesAPI } from '../services/api';
 import { supabase } from '../services/supabaseClient';
@@ -8,6 +8,7 @@ export default function MatchDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { state } = useLocation();
 
   const [match, setMatch] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -15,7 +16,7 @@ export default function MatchDetail() {
   const [joinRequests, setJoinRequests] = useState([]);
   const [players, setPlayers] = useState([]);
   const [hasRequested, setHasRequested] = useState(false);
-  const [activeTab, setActiveTab] = useState('info'); // info, chat, requests
+  const [activeTab, setActiveTab] = useState(state?.openTab || 'info'); // info, chat, requests
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

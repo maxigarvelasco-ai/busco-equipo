@@ -28,7 +28,12 @@ export default function Notifications() {
       await notificationsAPI.markAsRead(notif.id);
     }
     if (notif.data && typeof notif.data === 'string' && notif.data.startsWith('/')) {
-      navigate(notif.data);
+      // If it's a join request, navigate to the match detail page and open the requests tab
+      if (notif.type === 'join_request_received') {
+        navigate(notif.data, { state: { openTab: 'requests' } });
+      } else {
+        navigate(notif.data);
+      }
     }
   };
 
