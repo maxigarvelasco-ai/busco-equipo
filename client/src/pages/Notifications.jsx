@@ -96,8 +96,9 @@ export default function Notifications() {
     const { requestId, matchId, userId } = notif.data || {};
 
     if (!requestId || !matchId || !userId) {
-      console.error('Notification data is missing required fields for this action.', notif.data);
-      alert('No se pueden procesar los datos de la solicitud.');
+      console.error('Notification data is missing required fields for this action. notif id=', notif.id, notif.data);
+      // mark notification with an error so UI shows a helpful message instead of an alert
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, errorMessage: 'Faltan datos para procesar la solicitud.' } : n));
       return;
     }
 
@@ -188,6 +189,9 @@ export default function Notifications() {
                             )}
                             {!(notif.data && (notif.data.requestId || notif.data.request_id || notif.data.requestId)) && (
                               <div className="notif-no-action">Faltan datos de la solicitud para procesar (requestId/matchId/userId)</div>
+                            )}
+                            {notif.errorMessage && (
+                              <div className="notif-error" style={{ color: 'orange', marginTop: '0.5rem' }}>{notif.errorMessage}</div>
                             )}
                           </>
                         ) : (

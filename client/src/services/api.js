@@ -142,6 +142,18 @@ export const matchesAPI = {
     if (error) throw error;
   },
 
+  // Cancel a pending join request for the current user
+  async cancelRequest(matchId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { error } = await supabase
+      .from('match_join_requests')
+      .delete()
+      .match({ match_id: matchId, user_id: session.user.id, status: 'pending' });
+    if (error) throw error;
+  },
+
   async getPlayers(matchId) {
     const { data, error } = await supabase
       .from('match_players')

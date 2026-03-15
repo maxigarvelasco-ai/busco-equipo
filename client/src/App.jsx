@@ -16,6 +16,7 @@ import Clubs from './pages/Clubs';
 import ClubDetail from './pages/ClubDetail';
 import Fields from './pages/Fields';
 import Support from './pages/Support';
+import NotFoundPage from './pages/NotFoundPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -51,6 +52,7 @@ function AppRoutes() {
         <Route path="/profile" element={<><TopHeader /><ProtectedRoute><Profile /></ProtectedRoute><Navbar /></>} />
         <Route path="/notifications" element={<><TopHeader /><ProtectedRoute><Notifications /></ProtectedRoute><Navbar /></>} />
         <Route path="/support" element={<><TopHeader /><ProtectedRoute><Support /></ProtectedRoute><Navbar /></>} />
+        <Route path="*" element={<><TopHeader /><NotFoundPage /><Navbar /></>} />
       </Routes>
     </div>
   );
