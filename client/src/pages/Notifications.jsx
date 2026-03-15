@@ -93,33 +93,31 @@ export default function Notifications() {
 
   const handleRequestAction = async (notif, action) => {
     // The 'data' field for a join request should contain requestId, matchId, and userId
-    // This is an assumption based on the API. If this is not the case, this will fail.
-    const { requestId, matchId, userId } = notif.data;
+    const { requestId, matchId, userId } = notif.data || {};
 
     if (!requestId || !matchId || !userId) {
       console.error('Notification data is missing required fields for this action.', notif.data);
+      alert('No se pueden procesar los datos de la solicitud.');
       return;
     }
 
     setProcessingNotifId(notif.id);
+    console.log('Processing request action', { action, requestId, matchId, userId });
     try {
       if (action === 'accept') {
         await matchesAPI.approveRequest(requestId, matchId, userId);
       } else {
         await matchesAPI.rejectRequest(requestId, matchId, userId);
       }
-      // Optimistically hide the actions and mark as read
-      setNotifications(notifications.map(n => 
-        n.id === notif.id 
-        ? { ...n, is_read: true, handled: true } 
-        : n
-      ));
+
+      // Optimistically update notification UI: mark handled and read
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true, handled: true } : n));
+      console.log('Request action success', { action, requestId });
     } catch (err) {
       console.error(`Failed to ${action} request`, err);
+      alert('Error al procesar la solicitud: ' + (err?.message || err?.details || 'ver consola'));
     } finally {
       setProcessingNotifId(null);
-      // Optionally, you could reload all notifications here with loadNotifications()
-      // but optimistic update is faster.
     }
   };
 
@@ -172,21 +170,23 @@ export default function Notifications() {
                       <>
                         {(notif.type === 'join_request_received' || notif.type === 'match_join_request') ? (
                           <>
-                            <button 
-                              className="btn btn-sm btn-primary" 
-                              onClick={(e) => { e.stopPropagation(); if (notif.data && (notif.data.requestId || notif.data.request_id)) { handleRequestAction(notif, 'accept'); } else { console.error('Missing data for accept action', notif); alert('No se pueden procesar los datos de la solicitud.'); } }}
-                              disabled={!(notif.data && (notif.data.requestId || notif.data.request_id))}
-                            >
-                              Aceptar
-                            </button>
-                            <button 
-                              className="btn btn-sm btn-danger" 
-                              onClick={(e) => { e.stopPropagation(); if (notif.data && (notif.data.requestId || notif.data.request_id)) { handleRequestAction(notif, 'reject'); } else { console.error('Missing data for reject action', notif); alert('No se pueden procesar los datos de la solicitud.'); } }}
-                              disabled={!(notif.data && (notif.data.requestId || notif.data.request_id))}
-                            >
-                              Rechazar
-                            </button>
-                            {!(notif.data && (notif.data.requestId || notif.data.request_id)) && (
+                            {notif.handled ? (
+                              <div className="notif-handled">Solicitud procesada</div>
+                            ) : (
+                              <>
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'accept'); }}
+                                  disabled={processingNotifId === notif.id}
+                                >Aceptar</button>
+                                <button
+                                  className="btn btn-sm btn-danger"
+                                  onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'reject'); }}
+                                  disabled={processingNotifId === notif.id}
+                                >Rechazar</button>
+                              </>
+                            )}
+                            {!(notif.data && (notif.data.requestId || notif.data.request_id || notif.data.requestId)) && (
                               <div className="notif-no-action">Faltan datos de la solicitud para procesar (requestId/matchId/userId)</div>
                             )}
                           </>
