@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { notificationsAPI, matchesAPI } from '../services/api';
+import { supabase } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
 // Icons for different notification types
@@ -34,6 +35,47 @@ export default function Notifications() {
 
   useEffect(() => {
     loadNotifications();
+
+    // Real-time subscription: listen for new notifications and updates for this user
+    let subs = null;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const userId = session?.user?.id;
+        if (!userId) return;
+
+        subs = supabase.channel(`notifications_page_${userId}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (payload) => {
+            const n = payload.new || payload.record || null;
+            if (!n) return;
+            // normalize data like loadNotifications
+            let parsed = n.data;
+            if (typeof parsed === 'string') {
+              try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
+            }
+            if (!parsed || typeof parsed !== 'object') parsed = parsed || {};
+            const parsedData = {
+              requestId: parsed.requestId || parsed.request_id || parsed.requestid || parsed.request_id,
+              matchId: parsed.matchId || parsed.match_id || parsed.matchid || parsed.match_id,
+              userId: parsed.userId || parsed.user_id || parsed.userid || parsed.user_id,
+              path: parsed.path || parsed.url || parsed.route || null,
+              raw: parsed,
+            };
+            const newNotif = { ...n, data: parsed, parsedData };
+            setNotifications(prev => [newNotif, ...prev]);
+          })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (payload) => {
+            const n = payload.new || payload.record || null;
+            if (!n) return;
+            setNotifications(prev => prev.map(p => p.id === n.id ? { ...p, ...n } : p));
+          })
+          .subscribe();
+      } catch (e) {
+        console.error('Realtime notifications subscription failed', e);
+      }
+    })();
+
+    return () => { if (subs) supabase.removeChannel(subs); };
   }, []);
 
   const loadNotifications = async () => {
