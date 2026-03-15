@@ -49,6 +49,8 @@ export default function Notifications() {
   };
 
   const handleNotificationClick = async (notif) => {
+    // Ensure the notification expands on first click so actions are visible
+    setExpandedNotifId(notif.id);
     // mark as read and log for debugging
     try {
       if (!notif.is_read) {
@@ -60,17 +62,7 @@ export default function Notifications() {
     }
 
     console.log('Notification clicked:', notif);
-    // If the notification contains a resolvable path and it's not a join request,
-    // navigate immediately on first click so the user doesn't need a second click.
-    try {
-      const path = resolveNotifPath(notif);
-      if (path && notif.type !== 'join_request_received') {
-        navigate(path);
-        return;
-      }
-    } catch (err) {
-      console.error('Navigation on click failed', err);
-    }
+    // Do not auto-navigate here — expanding shows the action buttons.
   };
 
   const resolveNotifPath = (notif) => {
