@@ -1,4 +1,4 @@
-export default function MatchCard({ match, onJoin, onLeave, userId }) {
+export default function MatchCard({ match, onJoin, onLeave, onCancel, has_requested, userId, onOpen }) {
   const playersJoined = match.players_joined ?? match.current_players ?? 0;
   const maxPlayers = match.max_players;
   const isFull = playersJoined >= maxPlayers;
@@ -25,7 +25,7 @@ export default function MatchCard({ match, onJoin, onLeave, userId }) {
   }
 
   return (
-    <div className={`card match-card animate-in ${match.is_featured ? 'card-featured' : ''}`}>
+    <div className={`card match-card animate-in ${match.is_featured ? 'card-featured' : ''}`} onClick={() => onOpen?.(match.id)}>
       {match.is_featured && (
         <div className="badge badge-featured" style={{ marginBottom: '0.75rem' }}>
           ⭐ PARTIDO DESTACADO
@@ -74,11 +74,15 @@ export default function MatchCard({ match, onJoin, onLeave, userId }) {
         ) : isCreator ? (
           <span className="badge badge-type">TU PARTIDO</span>
         ) : match.has_joined ? (
-          <button className="btn btn-sm btn-secondary" onClick={() => onLeave?.(match.id)}>
+          <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); onLeave?.(match.id); }}>
             Salir
           </button>
+        ) : has_requested ? (
+          <button className="btn btn-sm btn-warning" onClick={(e) => { e.stopPropagation(); onCancel?.(match.id); }}>
+            Cancelar solicitud
+          </button>
         ) : (
-          <button className="btn btn-sm btn-primary" onClick={() => onJoin?.(match.id)}>
+          <button className="btn btn-sm btn-primary" onClick={(e) => { e.stopPropagation(); onJoin?.(match.id); }}>
             Unirme
           </button>
         )}

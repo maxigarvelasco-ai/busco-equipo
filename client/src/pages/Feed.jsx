@@ -21,13 +21,7 @@ export default function Feed() {
   const loadMatches = useCallback(async (showSpinner = false) => {
     try {
       if (showSpinner) setIsLoading(true);
-      
-      const { data, error: err } = await supabase
-        .from("matches")
-        .select("*")
-        .order("match_date", { ascending: true });
-      
-      if (err) throw err;
+      const data = await matchesAPI.getAll({ zone: selectedArea }, user?.id);
       setMatches(data || []);
       setError(null);
     } catch (err) {
@@ -37,7 +31,7 @@ export default function Feed() {
       setIsLoading(false);
       setInitialLoad(false);
     }
-  }, []);
+  }, [selectedArea, user]);
 
   useEffect(() => {
     loadMatches(true); // solo la primera vez muestra spinner
@@ -66,6 +60,17 @@ export default function Feed() {
       loadMatches(false); // recarga silenciosa
     } catch (err) {
       showToast(err.message || 'Error al salir', 'error');
+    }
+  };
+
+  const handleCancel = async (matchId) => {
+    try {
+      await matchesAPI.cancelRequest(matchId);
+      showToast('Solicitud cancelada');
+      loadMatches(false);
+    } catch (err) {
+      console.error('Error cancelling request:', err);
+      showToast(err.message || 'Error al cancelar solicitud', 'error');
     }
   };
 
@@ -111,11 +116,14 @@ export default function Feed() {
         </div>
       ) : (
         matches.map(match => (
-          <div key={match.id} onClick={() => navigate(`/match/${match.id}`)} style={{ cursor: 'pointer' }}>
+          <div key={match.id} style={{ cursor: 'pointer' }}>
             <MatchCard
               match={match}
-              onJoin={(e) => { e.stopPropagation(); handleJoin(match.id); }}
-              onLeave={(e) => { e.stopPropagation(); handleLeave(match.id); }}
+              onOpen={() => navigate(`/match/${match.id}`)}
+              onJoin={() => handleJoin(match.id)}
+              onLeave={() => handleLeave(match.id)}
+              onCancel={() => handleCancel(match.id)}
+              has_requested={match.has_requested}
               userId={user?.id}
             />
           </div>

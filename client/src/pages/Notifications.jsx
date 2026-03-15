@@ -40,7 +40,27 @@ export default function Notifications() {
     try {
       setLoading(true);
       const data = await notificationsAPI.getMine();
-      setNotifications(data);
+      // Normalize notif.data: parse JSON strings and provide common key aliases
+      const normalized = (data || []).map(n => {
+        let parsed = n.data;
+        if (typeof parsed === 'string') {
+          try { parsed = JSON.parse(parsed); } catch (e) { parsed = null; }
+        }
+        if (!parsed || typeof parsed !== 'object') parsed = parsed || {};
+
+        // Normalize keys: accept requestId/request_id, matchId/match_id, userId/user_id
+        const parsedData = {
+          requestId: parsed.requestId || parsed.request_id || parsed.requestid || parsed.request_id,
+          matchId: parsed.matchId || parsed.match_id || parsed.matchid || parsed.match_id,
+          userId: parsed.userId || parsed.user_id || parsed.userid || parsed.user_id,
+          path: parsed.path || parsed.url || parsed.route || null,
+          raw: parsed,
+        };
+
+        return { ...n, data: parsed, parsedData };
+      });
+
+      setNotifications(normalized);
     } catch (err) {
       console.error(err);
     } finally {
@@ -92,8 +112,8 @@ export default function Notifications() {
   };
 
   const handleRequestAction = async (notif, action) => {
-    // The 'data' field for a join request should contain requestId, matchId, and userId
-    const { requestId, matchId, userId } = notif.data || {};
+    // Use parsedData normalized at load time
+    const { requestId, matchId, userId } = notif.parsedData || {};
 
     if (!requestId || !matchId || !userId) {
       console.error('Notification data is missing required fields for this action. notif id=', notif.id, notif.data);
@@ -110,8 +130,10 @@ export default function Notifications() {
       } else {
         await matchesAPI.rejectRequest(requestId, matchId, userId);
       }
+      // Persist handled/read on server
+      try { await notificationsAPI.markHandled(notif.id); } catch (e) { console.error('Failed to persist notification handled flag', e); }
 
-      // Optimistically update notification UI: mark handled and read
+      // Update notification UI: mark handled and read
       setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, is_read: true, handled: true } : n));
       console.log('Request action success', { action, requestId });
     } catch (err) {
@@ -187,7 +209,7 @@ export default function Notifications() {
                                 >Rechazar</button>
                               </>
                             )}
-                            {!(notif.data && (notif.data.requestId || notif.data.request_id || notif.data.requestId)) && (
+                                {!(notif.parsedData && (notif.parsedData.requestId || notif.parsedData.matchId || notif.parsedData.userId)) && (
                               <div className="notif-no-action">Faltan datos de la solicitud para procesar (requestId/matchId/userId)</div>
                             )}
                             {notif.errorMessage && (

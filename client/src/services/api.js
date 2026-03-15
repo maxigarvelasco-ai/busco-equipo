@@ -55,12 +55,26 @@ export const matchesAPI = {
         }
       }
 
-      data.forEach(m => {
+      // Check which matches current user has a pending join request
+      let pendingSet = new Set();
+      if (currentUserId) {
+        const { data: myPending } = await supabase
+          .from('match_join_requests')
+          .select('match_id')
+          .eq('user_id', currentUserId)
+          .eq('status', 'pending');
+        if (myPending) {
+          pendingSet = new Set(myPending.map(p => p.match_id));
+        }
+      }
+
+        data.forEach(m => {
         const info = creatorMap[m.id] || {};
         m.creator_id = info.creator_id;
         m.creator_name = info.creator_name || 'Anónimo';
         m.creator_avatar = info.creator_avatar;
         m.has_joined = joinedSet.has(m.id);
+        m.has_requested = pendingSet.has(m.id);
       });
     }
 
@@ -373,6 +387,14 @@ export const notificationsAPI = {
     const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
+      .eq('id', notificationId);
+    if (error) throw error;
+  },
+
+  async markHandled(notificationId) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ handled: true, is_read: true })
       .eq('id', notificationId);
     if (error) throw error;
   },
