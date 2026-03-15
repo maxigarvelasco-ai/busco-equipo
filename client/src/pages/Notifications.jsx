@@ -60,7 +60,17 @@ export default function Notifications() {
     }
 
     console.log('Notification clicked:', notif);
-    // Do not auto-navigate; clicking should expand and show actions immediately.
+    // If the notification contains a resolvable path and it's not a join request,
+    // navigate immediately on first click so the user doesn't need a second click.
+    try {
+      const path = resolveNotifPath(notif);
+      if (path && notif.type !== 'join_request_received') {
+        navigate(path);
+        return;
+      }
+    } catch (err) {
+      console.error('Navigation on click failed', err);
+    }
   };
 
   const resolveNotifPath = (notif) => {
