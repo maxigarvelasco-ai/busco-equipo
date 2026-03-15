@@ -29,6 +29,7 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingNotifId, setProcessingNotifId] = useState(null);
+  const [expandedNotifId, setExpandedNotifId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,34 +49,44 @@ export default function Notifications() {
   };
 
   const handleNotificationClick = async (notif) => {
-    // For notifications without actions, navigate
-    if (notif.type !== 'join_request_received') {
+    // mark as read and log for debugging
+    try {
       if (!notif.is_read) {
         await notificationsAPI.markAsRead(notif.id);
-        // Also update the state to show it as read immediately
         setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
       }
-      let path = null;
-      if (notif.data) {
-          if (typeof notif.data === 'string' && notif.data.startsWith('/')) {
-              path = notif.data;
-          } else if (typeof notif.data === 'object' && notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) {
-              path = notif.data.path;
+    } catch (err) {
+      console.error('Failed to mark notification as read', err);
+    }
+
+    console.log('Notification clicked:', notif);
+    // Do not auto-navigate; clicking should expand and show actions immediately.
+  };
+
+  const resolveNotifPath = (notif) => {
+    if (!notif || !notif.data) return null;
+    try {
+      if (typeof notif.data === 'string') {
+        const s = notif.data;
+        if (s.startsWith('/')) return s;
+        try {
+          const parsed = JSON.parse(s);
+          if (typeof parsed === 'string' && parsed.startsWith('/')) return parsed;
+          if (parsed && typeof parsed === 'object') {
+            if (parsed.path && parsed.path.startsWith('/')) return parsed.path;
+            if (parsed.matchId || parsed.match_id || parsed.id) return `/match/${parsed.matchId || parsed.match_id || parsed.id}`;
           }
-      }
-      if (path) {
-        if (notif.type === 'new_chat_message') {
-          navigate(path, { state: { openTab: 'chat' } });
-        } else {
-          navigate(path);
+        } catch (e) {
+          return null;
         }
+      } else if (typeof notif.data === 'object') {
+        if (notif.data.path && typeof notif.data.path === 'string' && notif.data.path.startsWith('/')) return notif.data.path;
+        if (notif.data.matchId || notif.data.match_id || notif.data.id) return `/match/${notif.data.matchId || notif.data.match_id || notif.data.id}`;
       }
+    } catch (err) {
+      console.error('resolveNotifPath error', err);
     }
-    // For join requests, the action is handled by buttons, but we can still mark as read on click
-    else if (!notif.is_read) {
-       await notificationsAPI.markAsRead(notif.id);
-       setNotifications(notifications.map(n => n.id === notif.id ? { ...n, is_read: true } : n));
-    }
+    return null;
   };
 
   const handleRequestAction = async (notif, action) => {
@@ -131,11 +142,16 @@ export default function Notifications() {
         </div>
       ) : (
         <div className="notification-list">
-          {notifications.map(notif => (
-            <div 
-              key={notif.id} 
-              className={`notification-item ${notif.is_read ? 'is-read' : ''}`}
-              onClick={() => handleNotificationClick(notif)}
+          {notifications.map(notif => {
+            const path = resolveNotifPath(notif);
+            return (
+            <div
+              key={notif.id}
+              className={`notification-item ${notif.is_read ? 'is-read' : ''} ${expandedNotifId === notif.id ? 'is-expanded' : ''}`}
+              onClick={() => {
+                setExpandedNotifId(prev => prev === notif.id ? null : notif.id);
+                handleNotificationClick(notif);
+              }}
             >
               <div className="notification-icon">
                 {notificationIcons[notif.type] || notificationIcons.default}
@@ -146,31 +162,55 @@ export default function Notifications() {
                   {new Date(notif.created_at).toLocaleString()}
                 </span>
                 
-                {notif.type === 'join_request_received' && !notif.handled && typeof notif.data === 'object' && (
+                {((notif.type === 'join_request_received' && !notif.handled && typeof notif.data === 'object') || expandedNotifId === notif.id) && (
                   <div className="notification-actions">
                     {processingNotifId === notif.id ? (
                       <div className="spinner-sm"></div>
                     ) : (
                       <>
-                        <button 
-                          className="btn btn-sm btn-primary" 
-                          onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'accept'); }}
-                        >
-                          Aceptar
-                        </button>
-                        <button 
-                          className="btn btn-sm btn-danger" 
-                          onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'reject'); }}
-                        >
-                          Rechazar
-                        </button>
+                        {notif.type === 'join_request_received' ? (
+                          <>
+                            <button 
+                              className="btn btn-sm btn-primary" 
+                              onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'accept'); }}
+                            >
+                              Aceptar
+                            </button>
+                            <button 
+                              className="btn btn-sm btn-danger" 
+                              onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'reject'); }}
+                            >
+                              Rechazar
+                            </button>
+                          </>
+                        ) : (
+                          // non-join notifications: show navigation/action buttons when expanded
+                          path ? (
+                            <>
+                              {notif.type === 'new_chat_message' ? (
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={(e) => { e.stopPropagation(); navigate(path, { state: { openTab: 'chat' } }); }}
+                                >Abrir chat</button>
+                              ) : (
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={(e) => { e.stopPropagation(); navigate(path); }}
+                                >Ver</button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="notif-no-action">Sin acción disponible</div>
+                          )
+                        )}
                       </>
                     )}
                   </div>
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
