@@ -159,31 +159,36 @@ export default function Notifications() {
                 {notificationIcons[notif.type] || notificationIcons.default}
               </div>
               <div className="notification-content">
-                <p>{notif.content}</p>
+                <p>{notif.content || notif.message}</p>
                 <span className="notification-date">
                   {new Date(notif.created_at).toLocaleString()}
                 </span>
                 
-                {((notif.type === 'join_request_received' && !notif.handled && typeof notif.data === 'object') || expandedNotifId === notif.id) && (
+                {expandedNotifId === notif.id && (
                   <div className="notification-actions">
                     {processingNotifId === notif.id ? (
                       <div className="spinner-sm"></div>
                     ) : (
                       <>
-                        {notif.type === 'join_request_received' ? (
+                        {(notif.type === 'join_request_received' || notif.type === 'match_join_request') ? (
                           <>
                             <button 
                               className="btn btn-sm btn-primary" 
-                              onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'accept'); }}
+                              onClick={(e) => { e.stopPropagation(); if (notif.data && (notif.data.requestId || notif.data.request_id)) { handleRequestAction(notif, 'accept'); } else { console.error('Missing data for accept action', notif); alert('No se pueden procesar los datos de la solicitud.'); } }}
+                              disabled={!(notif.data && (notif.data.requestId || notif.data.request_id))}
                             >
                               Aceptar
                             </button>
                             <button 
                               className="btn btn-sm btn-danger" 
-                              onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'reject'); }}
+                              onClick={(e) => { e.stopPropagation(); if (notif.data && (notif.data.requestId || notif.data.request_id)) { handleRequestAction(notif, 'reject'); } else { console.error('Missing data for reject action', notif); alert('No se pueden procesar los datos de la solicitud.'); } }}
+                              disabled={!(notif.data && (notif.data.requestId || notif.data.request_id))}
                             >
                               Rechazar
                             </button>
+                            {!(notif.data && (notif.data.requestId || notif.data.request_id)) && (
+                              <div className="notif-no-action">Faltan datos de la solicitud para procesar (requestId/matchId/userId)</div>
+                            )}
                           </>
                         ) : (
                           // non-join notifications: show navigation/action buttons when expanded
