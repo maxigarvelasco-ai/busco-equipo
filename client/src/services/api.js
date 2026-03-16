@@ -504,13 +504,13 @@ export const notificationsAPI = {
     if (error) throw error;
   },
 
-  async create(userId, type, content, data) {
+  async create(userId, type, message, data) {
     const { error } = await supabase
       .from('notifications')
       .insert({
         user_id: userId,
         type,
-        content,
+        message,
         data,
       });
     if (error) console.error('Error creating notification:', error);
