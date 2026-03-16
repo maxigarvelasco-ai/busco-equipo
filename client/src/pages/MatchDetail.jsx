@@ -151,6 +151,13 @@ export default function MatchDetail() {
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;
   if (!match) return <div className="page-content">Partido no encontrado</div>;
 
+  const toLocalDate = (dateStr) => {
+    if (!dateStr) return new Date();
+    const [y, m, d] = String(dateStr).split('-').map(Number);
+    if (!y || !m || !d) return new Date(dateStr);
+    return new Date(y, m - 1, d);
+  };
+
   const ownerId = match.owner_id ?? match.creator_id ?? null;
   const isCreator = Boolean(user && ownerId && String(user.id) === String(ownerId));
 
@@ -179,7 +186,7 @@ export default function MatchDetail() {
           </div>
           <div className="match-info-row">
             <span className="info-icon">📅</span>
-            <span>{new Date(match.match_date).toLocaleDateString()} {match.match_time?.slice(0,5)}</span>
+            <span>{toLocalDate(match.match_date).toLocaleDateString('es-AR')} {match.match_time?.slice(0,5)}</span>
           </div>
           <div className="match-info-row">
             <span className="info-icon">👤</span>
@@ -223,7 +230,6 @@ export default function MatchDetail() {
               {players.map(p => (
                 <li key={p.user_id} className="card" style={{ marginBottom: '0.5rem', padding: '0.75rem' }}>
                   <strong>{p.profiles?.name || 'Jugador'}</strong>
-                  {p.profiles?.ranking && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#666' }}>⭐ {p.profiles.ranking}</span>}
                 </li>
               ))}
             </ul>
@@ -305,7 +311,6 @@ export default function MatchDetail() {
               <div key={req.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <div>
                   <strong>{req.profiles?.name || 'Usuario'}</strong>
-                  {req.profiles?.ranking && <span style={{ marginLeft: '0.5rem', fontSize: '0.8rem', color: '#666' }}>⭐ {req.profiles.ranking}</span>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 

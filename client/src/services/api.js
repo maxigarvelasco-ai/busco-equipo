@@ -401,24 +401,46 @@ export const profilesAPI = {
     return data || [];
   },
 
-  async sendProfileMessage(toUserId, message) {
+  async addContact(contactUserId) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data: myProfile } = await supabase
-      .from('profiles')
-      .select('name')
-      .eq('id', session.user.id)
-      .maybeSingle();
-
-    const senderName = myProfile?.name || 'Usuario';
     const { error } = await supabase
-      .from('notifications')
+      .from('user_contacts')
+      .upsert(
+        [
+          { user_id: session.user.id, contact_user_id: contactUserId },
+          { user_id: contactUserId, contact_user_id: session.user.id },
+        ],
+        { onConflict: 'user_id,contact_user_id' }
+      );
+    if (error) throw error;
+  },
+
+  async getConversation(otherUserId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+    const me = session.user.id;
+
+    const { data, error } = await supabase
+      .from('direct_messages')
+      .select('*')
+      .or(`and(from_user_id.eq.${me},to_user_id.eq.${otherUserId}),and(from_user_id.eq.${otherUserId},to_user_id.eq.${me})`)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async sendDirectMessage(toUserId, message) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { error } = await supabase
+      .from('direct_messages')
       .insert({
-        user_id: toUserId,
-        type: 'profile_message',
-        message: `Mensaje de ${senderName}: ${message}`,
-        data: { fromUserId: session.user.id, path: '/profile' },
+        from_user_id: session.user.id,
+        to_user_id: toUserId,
+        message,
       });
     if (error) throw error;
   },

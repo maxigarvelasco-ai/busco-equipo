@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import CreateMatch from './pages/CreateMatch';
 import Profile from './pages/Profile';
+import UserProfile from './pages/UserProfile';
 import Venues from './pages/Venues';
 import Tournaments from './pages/Tournaments';
 import Subscription from './pages/Subscription';
@@ -50,6 +51,7 @@ function AppRoutes() {
         <Route path="/tournaments" element={<><TopHeader /><Tournaments /><Navbar /></>} />
         <Route path="/subscription" element={<><TopHeader /><ProtectedRoute><Subscription /></ProtectedRoute><Navbar /></>} />
         <Route path="/profile" element={<><TopHeader /><ProtectedRoute><Profile /></ProtectedRoute><Navbar /></>} />
+        <Route path="/users/:id" element={<><TopHeader /><ProtectedRoute><UserProfile /></ProtectedRoute><Navbar /></>} />
         <Route path="/notifications" element={<><TopHeader /><ProtectedRoute><Notifications /></ProtectedRoute><Navbar /></>} />
         <Route path="/support" element={<><TopHeader /><ProtectedRoute><Support /></ProtectedRoute><Navbar /></>} />
         <Route path="*" element={<><TopHeader /><NotFoundPage /><Navbar /></>} />

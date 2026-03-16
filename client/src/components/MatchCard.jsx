@@ -8,7 +8,14 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
   // Only consider user the creator when there's an authenticated user (`uid`) and a non-empty owner id
   const isCreator = Boolean(uid && matchCreatorId && String(uid) === String(matchCreatorId));
 
-  const matchDate = new Date(match.match_date);
+  const toLocalDate = (dateStr) => {
+    if (!dateStr) return new Date();
+    const [y, m, d] = String(dateStr).split('-').map(Number);
+    if (!y || !m || !d) return new Date(dateStr);
+    return new Date(y, m - 1, d);
+  };
+
+  const matchDate = toLocalDate(match.match_date);
   const today = new Date();
   const isToday = matchDate.toDateString() === today.toDateString();
   const tomorrow = new Date(today);

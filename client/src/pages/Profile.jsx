@@ -12,7 +12,6 @@ export default function Profile() {
   const [subscription, setSubscription] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [profileResults, setProfileResults] = useState([]);
-  const [profileMessages, setProfileMessages] = useState({});
   const [loading, setLoading] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -44,19 +43,6 @@ export default function Profile() {
     } catch (err) {
       console.error('Error searching profiles:', err);
       alert('No se pudieron buscar perfiles');
-    }
-  }
-
-  async function handleSendProfileMessage(targetId) {
-    const msg = (profileMessages[targetId] || '').trim();
-    if (!msg) return;
-    try {
-      await profilesAPI.sendProfileMessage(targetId, msg);
-      setProfileMessages(prev => ({ ...prev, [targetId]: '' }));
-      alert('Mensaje enviado');
-    } catch (err) {
-      console.error('Error sending profile message:', err);
-      alert('No se pudo enviar el mensaje');
     }
   }
 
@@ -109,47 +95,6 @@ export default function Profile() {
         </div>
       </div>
 
-      <div style={{ marginTop: 'var(--space-2xl)' }}>
-        <div className="section-header">
-          <span className="section-title">Buscar perfiles</span>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-          <input
-            className="form-input"
-            style={{ flex: 1 }}
-            placeholder="Nombre de usuario"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          <button className="btn btn-secondary" onClick={handleSearchProfiles}>Buscar</button>
-        </div>
-
-        {profileResults.map((p) => (
-          <div key={p.id} className="card" style={{ marginBottom: '0.75rem', padding: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-              {p.avatar_url ? (
-                <img src={p.avatar_url} alt={p.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ddd', display: 'grid', placeItems: 'center' }}>
-                  {(p.name || '?').slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <strong>{p.name || 'Sin nombre'}</strong>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input
-                className="form-input"
-                style={{ flex: 1 }}
-                placeholder="Escribir mensaje..."
-                value={profileMessages[p.id] || ''}
-                onChange={(e) => setProfileMessages(prev => ({ ...prev, [p.id]: e.target.value }))}
-              />
-              <button className="btn btn-primary" onClick={() => handleSendProfileMessage(p.id)}>Enviar</button>
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div style={{ marginTop: 'var(--space-2xl)', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
         {!isPro && (
           <button className="btn btn-gold btn-lg btn-full" onClick={() => navigate('/subscription')}>
@@ -172,6 +117,38 @@ export default function Profile() {
         >
           Cerrar Sesión
         </button>
+      </div>
+
+      <div style={{ marginTop: 'var(--space-2xl)' }}>
+        <div className="section-header">
+          <span className="section-title">Buscar perfiles</span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <input
+            className="form-input"
+            style={{ flex: 1 }}
+            placeholder="Nombre de usuario"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button className="btn btn-secondary" onClick={handleSearchProfiles}>Buscar</button>
+        </div>
+
+        {profileResults.map((p) => (
+          <div key={p.id} className="card" style={{ marginBottom: '0.75rem', padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              {p.avatar_url ? (
+                <img src={p.avatar_url} alt={p.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ddd', display: 'grid', placeItems: 'center' }}>
+                  {(p.name || '?').slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <strong>{p.name || 'Sin nombre'}</strong>
+            </div>
+            <button className="btn btn-primary" onClick={() => navigate(`/users/${p.id}`)}>Ver perfil</button>
+          </div>
+        ))}
       </div>
 
       {showReportModal && (
