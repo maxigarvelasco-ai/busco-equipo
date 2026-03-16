@@ -94,6 +94,13 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
             Unirme
           </button>
         )}
+
+        {/* Debug: show creator/user IDs when ?debug=1 is in URL */}
+        {typeof window !== 'undefined' && window.location.search.includes('debug=1') && (
+          <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#b71c1c' }}>
+            DEV: creatorId={String(match.creator_id ?? match.organizer_id ?? (match.creator && match.creator.id) ?? 'null')} • userId={String(userId ?? 'null')} • creator_name={match.creator_name ?? match.creator?.name ?? 'null'}
+          </div>
+        )}
       </div>
     </div>
   );
