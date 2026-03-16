@@ -555,6 +555,16 @@ export const venuesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('profile_type')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    if (myProfile?.profile_type !== 'venue_member') {
+      throw new Error('Solo perfiles miembro de canchas pueden agregar canchas');
+    }
+
     const fullPayload = {
       owner_id: session.user.id,
       name: venueData.name,

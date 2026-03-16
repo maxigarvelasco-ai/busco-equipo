@@ -8,7 +8,7 @@ const SUGGESTED_VENUES = [
 ];
 
 export default function Venues() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -20,6 +20,8 @@ export default function Venues() {
     football_types: [],
     services: [],
   });
+
+  const canManageVenues = user && profile?.profile_type === 'venue_member';
 
   useEffect(() => {
     async function fetchVenues() {
@@ -66,12 +68,18 @@ export default function Venues() {
     <div className="page-content">
       <div className="page-header">
         <h1 className="page-title">Canchas</h1>
-        {user && (
+        {canManageVenues && (
           <button className="btn btn-primary btn-sm" onClick={() => setShowCreate((v) => !v)}>
             {showCreate ? 'Cerrar' : 'Agregar'}
           </button>
         )}
       </div>
+
+      {user && !canManageVenues && (
+        <div className="card" style={{ marginBottom: '0.7rem', padding: '0.75rem', color: 'var(--color-text-secondary)' }}>
+          Solo perfiles "Miembro de canchas" pueden agregar canchas.
+        </div>
+      )}
 
       {showCreate && (
         <form className="card" onSubmit={handleCreateVenue} style={{ marginBottom: '0.7rem' }}>

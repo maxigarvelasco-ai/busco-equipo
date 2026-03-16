@@ -8,6 +8,7 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [profileType, setProfileType] = useState('normal');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -21,7 +22,7 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const data = await register(name, email, password);
+      const data = await register(name, email, password, profileType);
       // Supabase may require email confirmation
       if (data?.user && !data.session) {
         setSuccess(true);
@@ -103,6 +104,13 @@ export default function Register() {
               required
               minLength={6}
             />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Tipo de perfil</label>
+            <select className="form-select" value={profileType} onChange={(e) => setProfileType(e.target.value)}>
+              <option value="normal">Normal (jugador)</option>
+              <option value="venue_member">Miembro de canchas</option>
+            </select>
           </div>
           <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={loading}>
             {loading ? 'Creando cuenta...' : 'Crear Cuenta'}

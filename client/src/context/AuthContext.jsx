@@ -106,15 +106,29 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const register = async (name, email, password) => {
+  const register = async (name, email, password, profileType = 'normal') => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name },
+        data: { name, profile_type: profileType },
       },
     });
     if (error) throw error;
+
+    if (data?.user?.id) {
+      try {
+        await supabase
+          .from('profiles')
+          .upsert(
+            { id: data.user.id, name, profile_type: profileType },
+            { onConflict: 'id' }
+          );
+      } catch {
+        // If email confirmation or RLS prevents this now, metadata still carries profile_type.
+      }
+    }
+
     return data;
   };
 
