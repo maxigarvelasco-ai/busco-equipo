@@ -121,6 +121,18 @@ export default function MatchDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm('Seguro querés eliminar este partido? Esta acción no se puede deshacer.')) return;
+    try {
+      await matchesAPI.deleteMatch(id);
+      alert('Partido eliminado');
+      navigate('/');
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Error eliminando el partido');
+    }
+  };
+
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;
   if (!match) return <div className="page-content">Partido no encontrado</div>;
 
@@ -131,6 +143,9 @@ export default function MatchDetail() {
       <div className="page-header" style={{ marginBottom: '1rem' }}>
         <button className="btn btn-sm btn-secondary" onClick={() => navigate(-1)}>Volver</button>
         <h1 className="page-title" style={{ marginTop: '0.5rem' }}>Detalle del Partido</h1>
+        {isCreator && (
+          <button className="btn btn-sm btn-danger" style={{ marginLeft: '1rem' }} onClick={handleDelete}>Eliminar partido</button>
+        )}
       </div>
 
       <div className="card match-card" style={{ marginBottom: '1rem' }}>

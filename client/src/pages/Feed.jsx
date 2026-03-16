@@ -74,6 +74,18 @@ export default function Feed() {
     }
   };
 
+  const handleDelete = async (matchId) => {
+    if (!confirm('Seguro querés eliminar este partido?')) return;
+    try {
+      await matchesAPI.deleteMatch(matchId);
+      showToast('Partido eliminado');
+      loadMatches(false);
+    } catch (err) {
+      console.error('Error deleting match:', err);
+      showToast(err.message || 'Error al eliminar partido', 'error');
+    }
+  };
+
   return (
     <div className="page-content">
       {toast && (
@@ -123,6 +135,7 @@ export default function Feed() {
               onJoin={() => handleJoin(match.id)}
               onLeave={() => handleLeave(match.id)}
               onCancel={() => handleCancel(match.id)}
+              onDelete={() => handleDelete(match.id)}
               has_requested={match.has_requested}
               userId={user?.id}
             />

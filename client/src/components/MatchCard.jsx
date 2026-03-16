@@ -1,4 +1,4 @@
-export default function MatchCard({ match, onJoin, onLeave, onCancel, has_requested, userId, onOpen }) {
+export default function MatchCard({ match, onJoin, onLeave, onCancel, has_requested, userId, onOpen, onDelete }) {
   const playersJoined = match.players_joined ?? match.current_players ?? 0;
   const maxPlayers = match.max_players;
   const isFull = playersJoined >= maxPlayers;
@@ -72,7 +72,12 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
         {isFull ? (
           <span className="badge badge-full">COMPLETO</span>
         ) : isCreator ? (
-          <span className="badge badge-type">TU PARTIDO</span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <span className="badge badge-type">TU PARTIDO</span>
+            {onDelete && (
+              <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); onDelete(match.id); }} title="Eliminar partido">🗑️</button>
+            )}
+          </div>
         ) : match.has_joined ? (
           <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); onLeave?.(match.id); }}>
             Salir

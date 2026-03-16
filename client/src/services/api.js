@@ -123,6 +123,39 @@ export const matchesAPI = {
     return data || [];
   },
 
+  // Attempt to find a join request related to a notification that lacks data
+  // Strategy: find matches where creator_id == notif.user_id, then search recent join requests
+  async findRequestForNotification(notif) {
+    if (!notif || !notif.user_id || !notif.created_at) return null;
+    // 3 minute window around notification time
+    const notifTime = new Date(notif.created_at);
+    const start = new Date(notifTime.getTime() - 3 * 60 * 1000).toISOString();
+    const end = new Date(notifTime.getTime() + 3 * 60 * 1000).toISOString();
+
+    // find matches where the notif recipient is the creator
+    const { data: matchesData, error: mErr } = await supabase
+      .from('matches')
+      .select('id')
+      .eq('creator_id', notif.user_id);
+    if (mErr) throw mErr;
+    if (!matchesData || matchesData.length === 0) return null;
+    const matchIds = matchesData.map(m => m.id);
+
+    const { data: reqs, error: rErr } = await supabase
+      .from('match_join_requests')
+      .select('*')
+      .in('match_id', matchIds)
+      .gte('created_at', start)
+      .lte('created_at', end)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (rErr) throw rErr;
+    if (!reqs || reqs.length === 0) return null;
+    const r = reqs[0];
+    return { requestId: r.id, matchId: r.match_id, userId: r.user_id };
+  },
+
   // Join match (request)
   async requestJoin(matchId) {
     const { data: { session } } = await supabase.auth.getSession();
@@ -180,6 +213,15 @@ export const matchesAPI = {
   // Leave match (uses RPC function)
   async leave(matchId) {
     const { error } = await supabase.rpc('leave_match', { match_uuid: matchId });
+    if (error) throw error;
+  },
+
+  // Delete a match (organizer or admin only). Calls RPC `delete_match` created on the DB.
+  async deleteMatch(matchId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { error } = await supabase.rpc('delete_match', { p_match_id: matchId, p_requester_id: session.user.id });
     if (error) throw error;
   },
 
@@ -395,6 +437,15 @@ export const notificationsAPI = {
     const { error } = await supabase
       .from('notifications')
       .update({ handled: true, is_read: true })
+      .eq('id', notificationId);
+    if (error) throw error;
+  },
+
+  // Update notification.data column
+  async updateNotificationData(notificationId, dataObj) {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ data: dataObj })
       .eq('id', notificationId);
     if (error) throw error;
   },
