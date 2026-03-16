@@ -29,14 +29,14 @@ export const matchesAPI = {
       const matchIds = data.map(m => m.id);
       const { data: matchesWithCreators } = await supabase
         .from('matches')
-        .select('id, creator_id, profiles:creator_id(name, avatar_url)')
+        .select('id, organizer_id, profiles:organizer_id(name, avatar_url)')
         .in('id', matchIds);
 
       const creatorMap = {};
       if (matchesWithCreators) {
         matchesWithCreators.forEach(m => {
           creatorMap[m.id] = {
-            creator_id: m.creator_id,
+            creator_id: m.organizer_id,
             creator_name: m.profiles?.name || 'Anónimo',
             creator_avatar: m.profiles?.avatar_url,
           };
@@ -89,7 +89,7 @@ export const matchesAPI = {
     const { data, error } = await supabase
       .from('matches')
       .insert({
-        creator_id: session.user.id,
+        organizer_id: session.user.id,
         football_type: matchData.football_type,
         city: matchData.city || null,
         address: matchData.address || null,
@@ -132,11 +132,11 @@ export const matchesAPI = {
     const start = new Date(notifTime.getTime() - 3 * 60 * 1000).toISOString();
     const end = new Date(notifTime.getTime() + 3 * 60 * 1000).toISOString();
 
-    // find matches where the notif recipient is the creator
+    // find matches where the notif recipient is the organizer/creator
     const { data: matchesData, error: mErr } = await supabase
       .from('matches')
       .select('id')
-      .eq('creator_id', notif.user_id);
+      .eq('organizer_id', notif.user_id);
     if (mErr) throw mErr;
     if (!matchesData || matchesData.length === 0) return null;
     const matchIds = matchesData.map(m => m.id);
@@ -284,7 +284,7 @@ export const profilesAPI = {
     const { data, error } = await supabase
       .from('matches')
       .select('id, football_type, zone, match_date, match_time, max_players')
-      .eq('creator_id', userId)
+      .eq('organizer_id', userId)
       .order('match_date', { ascending: false })
       .limit(20);
     if (error) throw error;
