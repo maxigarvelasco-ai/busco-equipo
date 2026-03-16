@@ -266,7 +266,7 @@ export const matchesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { error } = await supabase.rpc('delete_match', {
+    const { error } = await supabase.rpc('delete_match_secure', {
       p_match_id: matchId,
       p_requester_id: session.user.id,
     });
