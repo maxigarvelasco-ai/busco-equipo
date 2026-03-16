@@ -20,6 +20,7 @@ export default function Venues() {
     football_types: [],
     services: [],
   });
+  const [citySuggestions, setCitySuggestions] = useState([]);
 
   const canManageVenues = user && profile?.profile_type === 'venue_member';
 
@@ -64,6 +65,42 @@ export default function Venues() {
     }
   };
 
+  useEffect(() => {
+    const query = (form.city || '').trim();
+    if (query.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=ar&q=${encodeURIComponent(query)}`;
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        const names = Array.from(
+          new Set(
+            (data || [])
+              .map((item) => item?.address?.city || item?.address?.town || item?.address?.village || item?.display_name?.split(',')?.[0])
+              .filter(Boolean)
+          )
+        ).slice(0, 6);
+
+        setCitySuggestions(names);
+      } catch {
+        if (!cancelled) setCitySuggestions([]);
+      }
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [form.city]);
+
   return (
     <div className="page-content">
       <div className="page-header">
@@ -93,7 +130,7 @@ export default function Venues() {
           </div>
           <div className="form-group">
             <label className="form-label">Ciudad</label>
-            <input className="form-input" value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} required />
+            <input className="form-input" list="venue-city-options" value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} required />
           </div>
 
           <div className="form-group">
@@ -121,6 +158,12 @@ export default function Venues() {
           <button className="btn btn-primary btn-full" type="submit" disabled={creating}>
             {creating ? 'Guardando...' : 'Guardar cancha'}
           </button>
+
+          <datalist id="venue-city-options">
+            {citySuggestions.map((city) => (
+              <option key={city} value={city} />
+            ))}
+          </datalist>
         </form>
       )}
 

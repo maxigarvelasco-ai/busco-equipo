@@ -1,19 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { matchesAPI, tournamentsAPI } from '../services/api';
-
-const CITY_SUGGESTIONS = [
-  'Rosario',
-  'Funes',
-  'Roldan',
-  'Villa Gobernador Galvez',
-  'Granadero Baigorria',
-  'Perez',
-  'San Lorenzo',
-  'Santa Fe',
-  'Cordoba',
-  'Buenos Aires',
-];
 
 export default function CreateMatch() {
   const navigate = useNavigate();
@@ -38,6 +25,49 @@ export default function CreateMatch() {
     needed_players: '2',
     description: '',
   });
+  const [citySuggestions, setCitySuggestions] = useState([]);
+
+  const currentCityQuery = requestType === 'casual_match' ? matchForm.city : tournamentForm.city;
+
+  useEffect(() => {
+    const query = (currentCityQuery || '').trim();
+    if (query.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=ar&q=${encodeURIComponent(query)}`;
+        const res = await fetch(url, {
+          headers: {
+            Accept: 'application/json',
+          },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        const names = Array.from(
+          new Set(
+            (data || [])
+              .map((item) => item?.address?.city || item?.address?.town || item?.address?.village || item?.display_name?.split(',')?.[0])
+              .filter(Boolean)
+          )
+        ).slice(0, 6);
+
+        setCitySuggestions(names);
+      } catch {
+        if (!cancelled) setCitySuggestions([]);
+      }
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [currentCityQuery]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -194,7 +224,7 @@ export default function CreateMatch() {
         </button>
 
         <datalist id="city-options">
-          {CITY_SUGGESTIONS.map((city) => (
+          {citySuggestions.map((city) => (
             <option key={city} value={city} />
           ))}
         </datalist>
