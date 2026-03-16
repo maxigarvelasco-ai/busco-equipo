@@ -105,31 +105,42 @@ export const matchesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data, error } = await supabase
-      .from('matches')
-      .insert({
+    const fullPayload = {
+      creator_id: session.user.id,
+      football_type: matchData.football_type,
+      title: matchData.title || null,
+      city: matchData.city || null,
+      address: matchData.address || null,
+      latitude: matchData.latitude || null,
+      longitude: matchData.longitude || null,
+      zone: matchData.zone,
+      match_date: matchData.match_date,
+      match_time: matchData.match_time,
+      max_players: matchData.max_players,
+      match_kind: matchData.match_kind || 'recreativo',
+      visibility: matchData.visibility || 'public',
+      requires_approval: typeof matchData.requires_approval === 'boolean' ? matchData.requires_approval : true,
+      allow_waitlist: typeof matchData.allow_waitlist === 'boolean' ? matchData.allow_waitlist : true,
+      price_per_player: matchData.price_per_player || 0,
+      description: matchData.description || null,
+    };
+
+    let data;
+    let error;
+    ({ data, error } = await supabase.from('matches').insert(fullPayload).select().single());
+    if (error) {
+      const minimalPayload = {
         creator_id: session.user.id,
         football_type: matchData.football_type,
-        title: matchData.title || null,
-        city: matchData.city || null,
-        address: matchData.address || null,
-        latitude: matchData.latitude || null,
-        longitude: matchData.longitude || null,
-        zone: matchData.zone,
+        zone: matchData.zone || matchData.city || 'Sin zona',
         match_date: matchData.match_date,
         match_time: matchData.match_time,
         max_players: matchData.max_players,
-        match_kind: matchData.match_kind || 'recreativo',
-        visibility: matchData.visibility || 'public',
-        requires_approval: typeof matchData.requires_approval === 'boolean' ? matchData.requires_approval : true,
-        allow_waitlist: typeof matchData.allow_waitlist === 'boolean' ? matchData.allow_waitlist : true,
-        price_per_player: matchData.price_per_player || 0,
         description: matchData.description || null,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
+      };
+      ({ data, error } = await supabase.from('matches').insert(minimalPayload).select().single());
+      if (error) throw error;
+    }
 
     // Creator auto-joins via RPC
     await supabase.rpc('join_match', { match_uuid: data.id });
@@ -544,21 +555,30 @@ export const venuesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data, error } = await supabase
-      .from('venues')
-      .insert({
+    const fullPayload = {
+      owner_id: session.user.id,
+      name: venueData.name,
+      address: venueData.address || null,
+      city: venueData.city || null,
+      zone: venueData.city || null,
+      football_types: venueData.football_types || [],
+      services: venueData.services || [],
+      amenities: venueData.services || [],
+    };
+
+    let data;
+    let error;
+    ({ data, error } = await supabase.from('venues').insert(fullPayload).select().single());
+    if (error) {
+      const minimalPayload = {
         owner_id: session.user.id,
         name: venueData.name,
         address: venueData.address || null,
-        city: venueData.city || null,
         zone: venueData.city || null,
-        football_types: venueData.football_types || [],
-        services: venueData.services || [],
-        amenities: venueData.services || [],
-      })
-      .select()
-      .single();
-    if (error) throw error;
+      };
+      ({ data, error } = await supabase.from('venues').insert(minimalPayload).select().single());
+      if (error) throw error;
+    }
     return data;
   },
 };
@@ -569,7 +589,7 @@ export const tournamentsAPI = {
   async getAll(filters = {}) {
     let query = supabase
       .from('tournaments')
-      .select('id, name, football_type, start_date, city, zone, venue_name, needed_players, description, organizer_id, profiles:organizer_id(name)')
+      .select('*')
       .order('start_date', { ascending: true });
 
     if (filters.football_type) {
@@ -579,9 +599,22 @@ export const tournamentsAPI = {
     const { data, error } = await query;
     if (error) throw error;
 
-    return (data || []).map(t => ({
+    const rows = data || [];
+    if (rows.length === 0) return [];
+
+    const organizerIds = Array.from(new Set(rows.map((t) => t.organizer_id).filter(Boolean)));
+    let profileMap = {};
+    if (organizerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .in('id', organizerIds);
+      profileMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+    }
+
+    return rows.map((t) => ({
       ...t,
-      organizer_name: t.profiles?.name || 'Anónimo',
+      organizer_name: profileMap[t.organizer_id]?.name || 'Anónimo',
       needed_players: t.needed_players ?? 1,
     }));
   },
@@ -590,9 +623,26 @@ export const tournamentsAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data, error } = await supabase
-      .from('tournaments')
-      .insert({
+    const fullPayload = {
+      organizer_id: session.user.id,
+      name: tournamentData.name,
+      football_type: parseInt(tournamentData.football_type),
+      start_date: tournamentData.start_date,
+      max_teams: tournamentData.max_teams || 2,
+      entry_price: tournamentData.entry_price || 0,
+      description: tournamentData.description || null,
+      city: tournamentData.city || null,
+      zone: tournamentData.city || null,
+      venue_name: tournamentData.venue_name || null,
+      needed_players: tournamentData.needed_players ? parseInt(tournamentData.needed_players) : 1,
+      visibility: 'public',
+    };
+
+    let data;
+    let error;
+    ({ data, error } = await supabase.from('tournaments').insert(fullPayload).select().single());
+    if (error) {
+      const minimalPayload = {
         organizer_id: session.user.id,
         name: tournamentData.name,
         football_type: parseInt(tournamentData.football_type),
@@ -600,15 +650,10 @@ export const tournamentsAPI = {
         max_teams: tournamentData.max_teams || 2,
         entry_price: tournamentData.entry_price || 0,
         description: tournamentData.description || null,
-        city: tournamentData.city || null,
-        zone: tournamentData.city || null,
-        venue_name: tournamentData.venue_name || null,
-        needed_players: tournamentData.needed_players ? parseInt(tournamentData.needed_players) : 1,
-        visibility: 'public',
-      })
-      .select()
-      .single();
-    if (error) throw error;
+      };
+      ({ data, error } = await supabase.from('tournaments').insert(minimalPayload).select().single());
+      if (error) throw error;
+    }
     return data;
   },
 

@@ -2,6 +2,19 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { matchesAPI, tournamentsAPI } from '../services/api';
 
+const CITY_SUGGESTIONS = [
+  'Rosario',
+  'Funes',
+  'Roldan',
+  'Villa Gobernador Galvez',
+  'Granadero Baigorria',
+  'Perez',
+  'San Lorenzo',
+  'Santa Fe',
+  'Cordoba',
+  'Buenos Aires',
+];
+
 export default function CreateMatch() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -120,7 +133,7 @@ export default function CreateMatch() {
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="form-group">
               <label className="form-label">Ciudad</label>
-              <input className="form-input" value={matchForm.city} onChange={(e) => setMatchForm((p) => ({ ...p, city: e.target.value }))} required />
+              <input className="form-input" list="city-options" value={matchForm.city} onChange={(e) => setMatchForm((p) => ({ ...p, city: e.target.value }))} required />
             </div>
             <div className="form-group">
               <label className="form-label">Cancha (opcional)</label>
@@ -157,7 +170,7 @@ export default function CreateMatch() {
             </div>
             <div className="form-group">
               <label className="form-label">Ciudad</label>
-              <input className="form-input" value={tournamentForm.city} onChange={(e) => setTournamentForm((p) => ({ ...p, city: e.target.value }))} />
+              <input className="form-input" list="city-options" value={tournamentForm.city} onChange={(e) => setTournamentForm((p) => ({ ...p, city: e.target.value }))} />
             </div>
             <div className="form-row">
               <div className="form-group">
@@ -179,6 +192,12 @@ export default function CreateMatch() {
         <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={loading}>
           {loading ? 'Publicando...' : 'Publicar solicitud'}
         </button>
+
+        <datalist id="city-options">
+          {CITY_SUGGESTIONS.map((city) => (
+            <option key={city} value={city} />
+          ))}
+        </datalist>
       </form>
     </div>
   );

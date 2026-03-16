@@ -21,12 +21,16 @@ export default function Feed() {
     try {
       if (showSpinner) setIsLoading(true);
       const footballType = selectedFootballType === 'Todas' ? null : selectedFootballType;
-      const [matchData, tournamentData] = await Promise.all([
-        matchesAPI.getAll({ football_type: footballType }, user?.id),
-        tournamentsAPI.getAll({ football_type: footballType }),
-      ]);
+      const matchData = await matchesAPI.getAll({ football_type: footballType }, user?.id);
       setMatches(matchData || []);
-      setTournaments(tournamentData || []);
+
+      try {
+        const tournamentData = await tournamentsAPI.getAll({ football_type: footballType });
+        setTournaments(tournamentData || []);
+      } catch (tErr) {
+        console.warn('Tournaments load warning:', tErr);
+        setTournaments([]);
+      }
       setError(null);
     } catch (err) {
       console.error("Error loading matches:", err);
