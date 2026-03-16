@@ -29,16 +29,18 @@ export const matchesAPI = {
       const matchIds = data.map(m => m.id);
       const { data: matchesWithCreators } = await supabase
         .from('matches')
-        .select('id, organizer_id, profiles:organizer_id(name, avatar_url)')
+        .select('id, creator_id, organizer_id, profiles_creator:creator_id(name, avatar_url), profiles_organizer:organizer_id(name, avatar_url)')
         .in('id', matchIds);
 
       const creatorMap = {};
       if (matchesWithCreators) {
         matchesWithCreators.forEach(m => {
+          const cid = m.creator_id ?? m.organizer_id;
+          const profile = (m.profiles_creator && m.profiles_creator.length && m.profiles_creator[0]) || (m.profiles_organizer && m.profiles_organizer.length && m.profiles_organizer[0]);
           creatorMap[m.id] = {
-            creator_id: m.organizer_id,
-            creator_name: m.profiles?.name || 'Anónimo',
-            creator_avatar: m.profiles?.avatar_url,
+            creator_id: cid,
+            creator_name: profile?.name || 'Anónimo',
+            creator_avatar: profile?.avatar_url,
           };
         });
       }
