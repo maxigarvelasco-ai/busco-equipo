@@ -531,8 +531,8 @@ export const venuesAPI = {
       .from('venues')
       .select('*, venue_slots(*)');
 
-    if (filters.zone && filters.zone !== 'Todas') {
-      query = query.eq('zone', filters.zone);
+    if (filters.city) {
+      query = query.eq('city', filters.city);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -546,7 +546,16 @@ export const venuesAPI = {
 
     const { data, error } = await supabase
       .from('venues')
-      .insert({ ...venueData, owner_id: session.user.id })
+      .insert({
+        owner_id: session.user.id,
+        name: venueData.name,
+        address: venueData.address || null,
+        city: venueData.city || null,
+        zone: venueData.city || null,
+        football_types: venueData.football_types || [],
+        services: venueData.services || [],
+        amenities: venueData.services || [],
+      })
       .select()
       .single();
     if (error) throw error;
@@ -557,17 +566,23 @@ export const venuesAPI = {
 // ========== TOURNAMENTS ==========
 
 export const tournamentsAPI = {
-  async getAll() {
-    const { data, error } = await supabase
+  async getAll(filters = {}) {
+    let query = supabase
       .from('tournaments')
-      .select('*, profiles:organizer_id(name), teams(id)')
+      .select('id, name, football_type, start_date, city, zone, venue_name, needed_players, description, organizer_id, profiles:organizer_id(name)')
       .order('start_date', { ascending: true });
+
+    if (filters.football_type) {
+      query = query.eq('football_type', parseInt(filters.football_type));
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
     return (data || []).map(t => ({
       ...t,
       organizer_name: t.profiles?.name || 'Anónimo',
-      teams_registered: t.teams?.length || 0,
+      needed_players: t.needed_players ?? 1,
     }));
   },
 
@@ -577,11 +592,37 @@ export const tournamentsAPI = {
 
     const { data, error } = await supabase
       .from('tournaments')
-      .insert({ ...tournamentData, organizer_id: session.user.id })
+      .insert({
+        organizer_id: session.user.id,
+        name: tournamentData.name,
+        football_type: parseInt(tournamentData.football_type),
+        start_date: tournamentData.start_date,
+        max_teams: tournamentData.max_teams || 2,
+        entry_price: tournamentData.entry_price || 0,
+        description: tournamentData.description || null,
+        city: tournamentData.city || null,
+        zone: tournamentData.city || null,
+        venue_name: tournamentData.venue_name || null,
+        needed_players: tournamentData.needed_players ? parseInt(tournamentData.needed_players) : 1,
+        visibility: 'public',
+      })
       .select()
       .single();
     if (error) throw error;
     return data;
+  },
+
+  async applyRequest(tournamentId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { error } = await supabase
+      .from('tournament_player_requests')
+      .upsert(
+        { tournament_id: tournamentId, user_id: session.user.id, status: 'pending' },
+        { onConflict: 'tournament_id,user_id' }
+      );
+    if (error) throw error;
   },
 
   async registerTeam(tournamentId, teamName) {

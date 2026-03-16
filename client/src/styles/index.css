@@ -421,7 +421,7 @@ a:hover { color: var(--color-primary-light); }
   border: none;
   background: none;
   cursor: pointer;
-  min-width: 56px;
+  min-width: 68px;
 }
 
 .nav-item:hover,

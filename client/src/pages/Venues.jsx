@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { venuesAPI } from '../services/api';
-
-const ZONES = ['Todas', 'Centro', 'Pichincha', 'Fisherton', 'Echesortu', 'Alberdi', 'Arroyito', 'Macrocentro'];
+import { useAuth } from '../context/AuthContext';
 const SUGGESTED_VENUES = [
   { id: 's1', name: 'Tifosi Futbol', zone: 'Pichincha', city: 'Rosario', football: 'F5/F7', amenities: ['iluminacion', 'vestuarios', 'buffet'] },
   { id: 's2', name: 'La Nueva Cancha', zone: 'Fisherton', city: 'Rosario', football: 'F7/F11', amenities: ['estacionamiento', 'duchas', 'bar'] },
@@ -9,17 +8,24 @@ const SUGGESTED_VENUES = [
 ];
 
 export default function Venues() {
+  const { user } = useAuth();
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedZone, setSelectedZone] = useState('Todas');
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    address: '',
+    city: '',
+    football_types: [],
+    services: [],
+  });
 
   useEffect(() => {
     async function fetchVenues() {
       try {
         setLoading(true);
-        const filters = {};
-        if (selectedZone !== 'Todas') filters.zone = selectedZone;
-        const data = await venuesAPI.getAll(filters);
+        const data = await venuesAPI.getAll({});
         setVenues(data);
       } catch {
         setVenues([]);
@@ -28,25 +34,87 @@ export default function Venues() {
       }
     }
     fetchVenues();
-  }, [selectedZone]);
+  }, []);
+
+  const toggleInArray = (key, value) => {
+    setForm((prev) => {
+      const arr = prev[key] || [];
+      return {
+        ...prev,
+        [key]: arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value],
+      };
+    });
+  };
+
+  const handleCreateVenue = async (e) => {
+    e.preventDefault();
+    try {
+      setCreating(true);
+      await venuesAPI.create(form);
+      setForm({ name: '', address: '', city: '', football_types: [], services: [] });
+      setShowCreate(false);
+      const data = await venuesAPI.getAll({});
+      setVenues(data);
+    } catch {
+      // keep minimal flow
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <div className="page-content">
       <div className="page-header">
         <h1 className="page-title">Canchas</h1>
+        {user && (
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCreate((v) => !v)}>
+            {showCreate ? 'Cerrar' : 'Agregar'}
+          </button>
+        )}
       </div>
 
-      <div className="area-filter">
-        {ZONES.map(zone => (
-          <button
-            key={zone}
-            className={`area-pill ${selectedZone === zone ? 'active' : ''}`}
-            onClick={() => setSelectedZone(zone)}
-          >
-            {zone}
+      {showCreate && (
+        <form className="card" onSubmit={handleCreateVenue} style={{ marginBottom: '0.7rem' }}>
+          <div className="form-group">
+            <label className="form-label">Nombre</label>
+            <input className="form-input" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Direccion</label>
+            <input className="form-input" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Ciudad</label>
+            <input className="form-input" value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} required />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Tipos de futbol</label>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {['F5', 'F7', 'F11'].map((ft) => (
+                <button key={ft} type="button" className={`btn btn-sm ${form.football_types.includes(ft) ? 'btn-primary' : 'btn-secondary'}`} onClick={() => toggleInArray('football_types', ft)}>
+                  {ft}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Servicios</label>
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              {['buffet', 'vestuarios', 'iluminacion', 'estacionamiento', 'torneos', 'entrenamiento funcional'].map((service) => (
+                <button key={service} type="button" className={`btn btn-sm ${form.services.includes(service) ? 'btn-primary' : 'btn-secondary'}`} onClick={() => toggleInArray('services', service)}>
+                  {service}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button className="btn btn-primary btn-full" type="submit" disabled={creating}>
+            {creating ? 'Guardando...' : 'Guardar cancha'}
           </button>
-        ))}
-      </div>
+        </form>
+      )}
 
       {loading ? (
         <div style={{ display: 'grid', gap: '0.8rem' }}>
@@ -86,8 +154,14 @@ export default function Venues() {
               <div className="match-info">
                 <div className="match-info-row">
                   <span className="info-icon">📍</span>
-                  <span>{venue.address || venue.zone} — <strong>{venue.zone}</strong></span>
+                  <span>{venue.address || venue.zone} - <strong>{venue.city || venue.zone}</strong></span>
                 </div>
+                {(venue.football_types && venue.football_types.length > 0) && (
+                  <div className="match-info-row">
+                    <span className="info-icon">⚽</span>
+                    <span>{venue.football_types.join(' ')}</span>
+                  </div>
+                )}
                 {venue.rating != null && (
                   <div className="match-info-row">
                     <span className="info-icon">⭐</span>
@@ -106,10 +180,10 @@ export default function Venues() {
                     <span>{venue.phone}</span>
                   </div>
                 )}
-                {venue.amenities && venue.amenities.length > 0 && (
+                {(venue.services && venue.services.length > 0) && (
                   <div className="match-info-row">
                     <span className="info-icon">🧰</span>
-                    <span>{venue.amenities.join(' · ')}</span>
+                    <span>{venue.services.join(' · ')}</span>
                   </div>
                 )}
               </div>
@@ -122,8 +196,8 @@ export default function Venues() {
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {venue.venue_slots.map(slot => (
-                      <span key={slot.id} className="badge badge-type" style={{ fontSize: '0.7rem' }}>
-                        F{slot.football_type} · {slot.slot_time?.slice(0, 5)} {slot.price ? `$${slot.price}` : ''}
+                      <span key={slot.id} className={`badge ${slot.is_booked || slot.status === 'booked' ? 'badge-full' : 'badge-type'}`} style={{ fontSize: '0.7rem' }}>
+                        {slot.slot_time?.slice(0, 5)} {slot.is_booked || slot.status === 'booked' ? 'reservado' : 'disponible'}
                       </span>
                     ))}
                   </div>

@@ -1,8 +1,6 @@
-import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export default function TopHeader() {
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -10,11 +8,7 @@ export default function TopHeader() {
       <div className="top-header-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer', margin: 0 }}>
         ⚽ Busco<span>Equipo</span>
       </div>
-      {user && (
-        <div onClick={() => navigate('/notifications')} style={{ cursor: 'pointer', fontSize: '1.5rem' }}>
-          🔔
-        </div>
-      )}
+      <div style={{ width: 24 }} />
     </header>
   );
 }
