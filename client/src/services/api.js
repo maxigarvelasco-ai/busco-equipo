@@ -29,14 +29,14 @@ export const matchesAPI = {
       const matchIds = data.map(m => m.id);
       const { data: matchesWithCreators } = await supabase
         .from('matches')
-        .select('id, creator_id, organizer_id, profiles_creator:creator_id(name, avatar_url), profiles_organizer:organizer_id(name, avatar_url)')
+        .select('id, creator_id, profiles_creator:creator_id(name, avatar_url)')
         .in('id', matchIds);
 
       const creatorMap = {};
       if (matchesWithCreators) {
         matchesWithCreators.forEach(m => {
-          const cid = m.creator_id ?? m.organizer_id;
-          const profile = (m.profiles_creator && m.profiles_creator.length && m.profiles_creator[0]) || (m.profiles_organizer && m.profiles_organizer.length && m.profiles_organizer[0]);
+          const cid = m.creator_id;
+          const profile = (m.profiles_creator && m.profiles_creator.length && m.profiles_creator[0]) || null;
           creatorMap[m.id] = {
             creator_id: cid,
             creator_name: profile?.name || 'Anónimo',
@@ -73,7 +73,7 @@ export const matchesAPI = {
         data.forEach(m => {
         const info = creatorMap[m.id] || {};
         m.creator_id = info.creator_id;
-        m.owner_id = info.creator_id || m.creator_id || m.organizer_id || null; // normalized owner id (creator/organizer)
+        m.owner_id = info.creator_id || m.creator_id || null; // normalized owner id (creator)
         m.creator_name = info.creator_name || 'Anónimo';
         m.creator_avatar = info.creator_avatar;
         m.has_joined = joinedSet.has(m.id);
@@ -92,7 +92,7 @@ export const matchesAPI = {
     const { data, error } = await supabase
       .from('matches')
       .insert({
-        organizer_id: session.user.id,
+        creator_id: session.user.id,
         football_type: matchData.football_type,
         city: matchData.city || null,
         address: matchData.address || null,
@@ -152,7 +152,7 @@ export const matchesAPI = {
     const { data: matchesData, error: mErr } = await supabase
       .from('matches')
       .select('id')
-      .eq('organizer_id', notif.user_id);
+      .eq('creator_id', notif.user_id);
     if (mErr) throw mErr;
     if (!matchesData || matchesData.length === 0) return null;
     const matchIds = matchesData.map(m => m.id);
@@ -326,7 +326,7 @@ export const profilesAPI = {
     const { data, error } = await supabase
       .from('matches')
       .select('id, football_type, zone, match_date, match_time, max_players')
-      .eq('organizer_id', userId)
+      .eq('creator_id', userId)
       .order('match_date', { ascending: false })
       .limit(20);
     if (error) throw error;

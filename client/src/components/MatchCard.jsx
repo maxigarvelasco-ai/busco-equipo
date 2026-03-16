@@ -4,7 +4,7 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
   const isFull = playersJoined >= maxPlayers;
   // Determine creator robustly: coerce to string to avoid number/string mismatch
   const uid = userId != null ? String(userId) : null;
-  const matchCreatorId = match.owner_id ?? match.creator_id ?? match.organizer_id ?? (match.creator && match.creator.id) ?? null;
+  const matchCreatorId = match.owner_id ?? match.creator_id ?? (match.creator && match.creator.id) ?? null;
   // Only consider user the creator when there's an authenticated user (`uid`) and a non-empty owner id
   const isCreator = Boolean(uid && matchCreatorId && String(uid) === String(matchCreatorId));
 
@@ -99,7 +99,7 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
         {/* Debug: show creator/user IDs when ?debug=1 is in URL */}
         {typeof window !== 'undefined' && window.location.search.includes('debug=1') && (
           <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#b71c1c' }}>
-            DEV: creatorId={String(match.creator_id ?? match.organizer_id ?? (match.creator && match.creator.id) ?? 'null')} • userId={String(userId ?? 'null')} • creator_name={match.creator_name ?? match.creator?.name ?? 'null'}
+            DEV: creatorId={String(match.owner_id ?? match.creator_id ?? (match.creator && match.creator.id) ?? 'null')} • userId={String(userId ?? 'null')} • creator_name={match.creator_name ?? match.creator?.name ?? 'null'}
           </div>
         )}
       </div>
