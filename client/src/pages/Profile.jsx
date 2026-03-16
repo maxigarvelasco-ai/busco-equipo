@@ -5,17 +5,45 @@ import { profilesAPI, subscriptionsAPI } from '../services/api';
 import ReportModal from '../components/ReportModal';
 
 export default function Profile() {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, updateProfile } = useAuth();
   const navigate = useNavigate();
   const [matchesJoined, setMatchesJoined] = useState([]);
   const [matchesAbandoned, setMatchesAbandoned] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    city: '',
+    zone: '',
+    preferred_position: '',
+    preferred_foot: '',
+    skill_level: '',
+    bio: '',
+    phone: '',
+    is_profile_public: true,
+  });
 
   useEffect(() => {
     if (user) fetchData();
   }, [user]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setEditForm({
+      name: profile.name || '',
+      city: profile.city || '',
+      zone: profile.zone || '',
+      preferred_position: profile.preferred_position || '',
+      preferred_foot: profile.preferred_foot || '',
+      skill_level: profile.skill_level || '',
+      bio: profile.bio || '',
+      phone: profile.phone || '',
+      is_profile_public: profile.is_profile_public !== false,
+    });
+  }, [profile]);
 
   async function fetchData() {
     try {
@@ -31,6 +59,33 @@ export default function Profile() {
       console.error('Error loading profile data:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSaveProfile(e) {
+    e.preventDefault();
+    setSaveMsg('');
+    setSaving(true);
+    try {
+      const updates = {
+        name: editForm.name,
+        city: editForm.city || null,
+        zone: editForm.zone || null,
+        preferred_position: editForm.preferred_position || null,
+        preferred_foot: editForm.preferred_foot || null,
+        skill_level: editForm.skill_level ? parseInt(editForm.skill_level) : null,
+        bio: editForm.bio || null,
+        phone: editForm.phone || null,
+        is_profile_public: !!editForm.is_profile_public,
+      };
+      const { error } = await updateProfile(updates);
+      if (error) throw error;
+      setSaveMsg('Perfil actualizado');
+      setTimeout(() => setSaveMsg(''), 2500);
+    } catch (err) {
+      setSaveMsg(err.message || 'No se pudo guardar');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -82,6 +137,75 @@ export default function Profile() {
           <div className="stat-value">{isPro ? 'Pro' : 'Free'}</div>
           <div className="stat-label">Plan</div>
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
+        <h3 style={{ marginBottom: '0.8rem' }}>Mi ficha de jugador</h3>
+        <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: '0.75rem' }}>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Nombre</label>
+              <input className="form-input" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Nivel</label>
+              <select className="form-select" value={editForm.skill_level} onChange={(e) => setEditForm((p) => ({ ...p, skill_level: e.target.value }))}>
+                <option value="">No definido</option>
+                {Array.from({ length: 10 }).map((_, idx) => (
+                  <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Ciudad</label>
+              <input className="form-input" value={editForm.city} onChange={(e) => setEditForm((p) => ({ ...p, city: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Zona</label>
+              <input className="form-input" value={editForm.zone} onChange={(e) => setEditForm((p) => ({ ...p, zone: e.target.value }))} />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Posición</label>
+              <input className="form-input" value={editForm.preferred_position} onChange={(e) => setEditForm((p) => ({ ...p, preferred_position: e.target.value }))} placeholder="Ej: Volante" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Pierna hábil</label>
+              <select className="form-select" value={editForm.preferred_foot} onChange={(e) => setEditForm((p) => ({ ...p, preferred_foot: e.target.value }))}>
+                <option value="">No definido</option>
+                <option value="left">Zurda</option>
+                <option value="right">Derecha</option>
+                <option value="both">Ambas</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Bio</label>
+            <textarea className="form-textarea" value={editForm.bio} onChange={(e) => setEditForm((p) => ({ ...p, bio: e.target.value }))} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Teléfono</label>
+            <input className="form-input" value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input type="checkbox" checked={editForm.is_profile_public} onChange={(e) => setEditForm((p) => ({ ...p, is_profile_public: e.target.checked }))} />
+            Permitir que otros encuentren mi perfil
+          </label>
+
+          {saveMsg && <div style={{ color: saveMsg === 'Perfil actualizado' ? 'var(--color-primary)' : 'var(--color-danger)', fontSize: '0.85rem' }}>{saveMsg}</div>}
+
+          <button type="submit" className="btn btn-primary btn-full" disabled={saving}>
+            {saving ? 'Guardando...' : 'Guardar perfil'}
+          </button>
+        </form>
       </div>
 
       <div style={{ marginTop: 'var(--space-2xl)', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>

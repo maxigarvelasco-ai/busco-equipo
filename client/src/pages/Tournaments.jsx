@@ -13,7 +13,7 @@ export default function Tournaments() {
   const [isPro, setIsPro] = useState(false);
 
   const [form, setForm] = useState({
-    name: '', football_type: 5, start_date: '', max_teams: 8, entry_price: 0, description: ''
+    name: '', football_type: 5, start_date: '', max_teams: 8, entry_price: 0, city: '', zone: '', visibility: 'public', format: '', prize: '', registration_deadline: '', description: ''
   });
 
   useEffect(() => {
@@ -53,6 +53,13 @@ export default function Tournaments() {
         start_date: form.start_date,
         max_teams: parseInt(form.max_teams),
         entry_price: parseFloat(form.entry_price) || 0,
+        city: form.city || null,
+        zone: form.zone || null,
+        visibility: form.visibility,
+        format: form.format || null,
+        prize: form.prize || null,
+        registration_deadline: form.registration_deadline || null,
+        description: form.description || null,
       });
       showToast('¡Torneo creado!');
       setShowCreate(false);
@@ -120,6 +127,43 @@ export default function Tournaments() {
                 <input type="number" className="form-input" value={form.entry_price} onChange={e => setForm({ ...form, entry_price: e.target.value })} min="0" />
               </div>
             </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Ciudad</label>
+                <input className="form-input" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Zona</label>
+                <input className="form-input" value={form.zone} onChange={e => setForm({ ...form, zone: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Visibilidad</label>
+                <select className="form-select" value={form.visibility} onChange={e => setForm({ ...form, visibility: e.target.value })}>
+                  <option value="public">Público</option>
+                  <option value="private">Privado</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Formato</label>
+                <input className="form-input" value={form.format} onChange={e => setForm({ ...form, format: e.target.value })} placeholder="Liga / Copa / Eliminación" />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Premio</label>
+                <input className="form-input" value={form.prize} onChange={e => setForm({ ...form, prize: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Cierre inscripción</label>
+                <input type="date" className="form-input" value={form.registration_deadline} onChange={e => setForm({ ...form, registration_deadline: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Descripción</label>
+              <textarea className="form-textarea" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+            </div>
             <button type="submit" className="btn btn-primary btn-full">Crear Torneo</button>
           </form>
         </div>
@@ -143,6 +187,9 @@ export default function Tournaments() {
                   <div className="match-info-row"><span className="info-icon">⚽</span><span>Fútbol {t.football_type}</span></div>
                   <div className="match-info-row"><span className="info-icon">📅</span><span>{new Date(t.start_date).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}</span></div>
                   <div className="match-info-row"><span className="info-icon">👥</span><span>{t.teams_registered}/{t.max_teams} equipos</span></div>
+                  {(t.city || t.zone) && <div className="match-info-row"><span className="info-icon">📌</span><span>{[t.city, t.zone].filter(Boolean).join(' · ')}</span></div>}
+                  {t.format && <div className="match-info-row"><span className="info-icon">🧩</span><span>{t.format}</span></div>}
+                  {t.prize && <div className="match-info-row"><span className="info-icon">🏅</span><span>{t.prize}</span></div>}
                   {t.organizer_name && <div className="match-info-row"><span className="info-icon">👤</span><span>Organiza: {t.organizer_name}</span></div>}
                 </div>
               </div>

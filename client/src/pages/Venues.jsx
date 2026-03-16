@@ -61,10 +61,28 @@ export default function Venues() {
                   <span className="info-icon">📍</span>
                   <span>{venue.address || venue.zone} — <strong>{venue.zone}</strong></span>
                 </div>
+                {venue.rating != null && (
+                  <div className="match-info-row">
+                    <span className="info-icon">⭐</span>
+                    <span>{Number(venue.rating).toFixed(1)} / 5</span>
+                  </div>
+                )}
+                {venue.is_verified && (
+                  <div className="match-info-row">
+                    <span className="info-icon">✅</span>
+                    <span>Cancha verificada</span>
+                  </div>
+                )}
                 {venue.phone && (
                   <div className="match-info-row">
                     <span className="info-icon">📞</span>
                     <span>{venue.phone}</span>
+                  </div>
+                )}
+                {venue.amenities && venue.amenities.length > 0 && (
+                  <div className="match-info-row">
+                    <span className="info-icon">🧰</span>
+                    <span>{venue.amenities.join(' · ')}</span>
                   </div>
                 )}
               </div>
@@ -89,6 +107,11 @@ export default function Venues() {
               <button className="btn btn-primary btn-sm">Reservar</button>
               {venue.phone && (
                 <a href={`tel:${venue.phone}`} className="btn btn-secondary btn-sm">Llamar</a>
+              )}
+              {venue.whatsapp && (
+                <a href={`https://wa.me/${venue.whatsapp.replace(/\D/g, '')}`} className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer">
+                  WhatsApp
+                </a>
               )}
             </div>
           </div>

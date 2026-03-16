@@ -15,6 +15,12 @@ export const matchesAPI = {
     if (filters.football_type) {
       query = query.eq('football_type', parseInt(filters.football_type));
     }
+    if (filters.visibility && filters.visibility !== 'all') {
+      query = query.eq('visibility', filters.visibility);
+    }
+    if (filters.level_required) {
+      query = query.eq('level_required', parseInt(filters.level_required));
+    }
 
     query = query.order('is_featured', { ascending: false })
       .order('match_date', { ascending: true })
@@ -104,6 +110,7 @@ export const matchesAPI = {
       .insert({
         creator_id: session.user.id,
         football_type: matchData.football_type,
+        title: matchData.title || null,
         city: matchData.city || null,
         address: matchData.address || null,
         latitude: matchData.latitude || null,
@@ -112,6 +119,11 @@ export const matchesAPI = {
         match_date: matchData.match_date,
         match_time: matchData.match_time,
         max_players: matchData.max_players,
+        level_required: matchData.level_required || null,
+        visibility: matchData.visibility || 'public',
+        requires_approval: typeof matchData.requires_approval === 'boolean' ? matchData.requires_approval : true,
+        allow_waitlist: typeof matchData.allow_waitlist === 'boolean' ? matchData.allow_waitlist : true,
+        price_per_player: matchData.price_per_player || 0,
         description: matchData.description || null,
       })
       .select()
@@ -334,6 +346,34 @@ export const matchesAPI = {
       .insert({ match_id: matchId, expires_at: expiresAt });
     if (error) throw error;
   },
+
+  async confirmAttendance(matchId, status = 'confirmed') {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data, error } = await supabase.rpc('confirm_match_attendance', {
+      p_match_id: matchId,
+      p_user_id: session.user.id,
+      p_status: status,
+    });
+    if (error) throw error;
+    return data;
+  },
+
+  async reviewPlayer(matchId, reviewedUserId, rating, comment = '') {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data, error } = await supabase.rpc('review_player_after_match', {
+      p_match_id: matchId,
+      p_reviewer_id: session.user.id,
+      p_reviewed_user_id: reviewedUserId,
+      p_rating: rating,
+      p_comment: comment || null,
+    });
+    if (error) throw error;
+    return data;
+  },
 };
 
 // ========== PROFILES ==========
@@ -383,14 +423,16 @@ export const profilesAPI = {
   },
 
   async searchProfiles(term, currentUserId) {
+    const trimmed = term?.trim() || '';
     let query = supabase
       .from('profiles')
-      .select('id, name, avatar_url')
+      .select('id, name, avatar_url, city, zone, preferred_position, skill_level')
+      .eq('is_profile_public', true)
       .order('name', { ascending: true })
       .limit(20);
 
-    if (term && term.trim()) {
-      query = query.ilike('name', `%${term.trim()}%`);
+    if (trimmed) {
+      query = query.or(`name.ilike.%${trimmed}%,nickname.ilike.%${trimmed}%,city.ilike.%${trimmed}%,zone.ilike.%${trimmed}%`);
     }
     if (currentUserId) {
       query = query.neq('id', currentUserId);
@@ -399,6 +441,32 @@ export const profilesAPI = {
     const { data, error } = await query;
     if (error) throw error;
     return data || [];
+  },
+
+  async updateMine(profileData) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const payload = {
+      name: profileData.name,
+      city: profileData.city || null,
+      zone: profileData.zone || null,
+      preferred_position: profileData.preferred_position || null,
+      preferred_foot: profileData.preferred_foot || null,
+      skill_level: profileData.skill_level ? parseInt(profileData.skill_level) : null,
+      bio: profileData.bio || null,
+      phone: profileData.phone || null,
+      is_profile_public: !!profileData.is_profile_public,
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(payload)
+      .eq('id', session.user.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   },
 
   async addContact(contactUserId) {
@@ -789,4 +857,82 @@ export const reportsAPI = {
       });
     if (error) throw error;
   }
+};
+
+// ========== USER TEAMS ==========
+
+export const userTeamsAPI = {
+  async getAll(filters = {}) {
+    let query = supabase
+      .from('user_teams')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (filters.zone && filters.zone !== 'Todas') {
+      query = query.eq('zone', filters.zone);
+    }
+    if (filters.football_type) {
+      query = query.eq('football_type', parseInt(filters.football_type));
+    }
+    if (filters.is_recruiting) {
+      query = query.eq('is_recruiting', true);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async create(teamData) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const payload = {
+      name: teamData.name,
+      city: teamData.city || null,
+      zone: teamData.zone || null,
+      football_type: teamData.football_type ? parseInt(teamData.football_type) : null,
+      level: teamData.level ? parseInt(teamData.level) : null,
+      description: teamData.description || null,
+      is_public: teamData.is_public !== false,
+      is_recruiting: !!teamData.is_recruiting,
+      captain_id: session.user.id,
+    };
+
+    const { data, error } = await supabase
+      .from('user_teams')
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+
+    await supabase
+      .from('user_team_members')
+      .upsert({
+        team_id: data.id,
+        user_id: session.user.id,
+        role: 'captain',
+        status: 'active',
+      }, { onConflict: 'team_id,user_id' });
+
+    return data;
+  },
+
+  async requestJoin(teamId, message = '') {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data, error } = await supabase
+      .from('user_team_join_requests')
+      .insert({
+        team_id: teamId,
+        user_id: session.user.id,
+        message: message || null,
+        status: 'pending',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
 };

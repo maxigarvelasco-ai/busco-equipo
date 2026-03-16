@@ -11,6 +11,7 @@ export default function CreateMatch() {
 
   const [form, setForm] = useState({
     football_type: '5',
+    title: '',
     city: '',
     address: '',
     latitude: null,
@@ -19,6 +20,11 @@ export default function CreateMatch() {
     match_date: new Date().toISOString().split('T')[0],
     match_time: '21:00',
     max_players: '10',
+    level_required: '',
+    visibility: 'public',
+    requires_approval: true,
+    allow_waitlist: true,
+    price_per_player: '0',
     description: '',
   });
 
@@ -92,6 +98,10 @@ export default function CreateMatch() {
      }));
   }
 
+  const handleCheckbox = (name) => {
+    setForm((prev) => ({ ...prev, [name]: !prev[name] }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -111,6 +121,7 @@ export default function CreateMatch() {
     try {
       await matchesAPI.create({
         football_type: parseInt(form.football_type),
+        title: form.title || null,
         city: form.city,
         address: form.address || null,
         latitude: form.latitude,
@@ -119,6 +130,11 @@ export default function CreateMatch() {
         match_date: form.match_date,
         match_time: form.match_time,
         max_players: parseInt(form.max_players),
+        level_required: form.level_required ? parseInt(form.level_required) : null,
+        visibility: form.visibility,
+        requires_approval: form.requires_approval,
+        allow_waitlist: form.allow_waitlist,
+        price_per_player: parseFloat(form.price_per_player || '0'),
         description: form.description || null,
       });
       navigate('/');
@@ -138,6 +154,18 @@ export default function CreateMatch() {
       {error && <div className="form-error">{error}</div>}
 
       <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label className="form-label">Título (opcional)</label>
+          <input
+            type="text"
+            className="form-input"
+            name="title"
+            placeholder="Ej: Pachanga nivel intermedio"
+            value={form.title}
+            onChange={handleChange}
+          />
+        </div>
+
         {/* Football type */}
         <div className="form-group">
           <label className="form-label">Tipo de Fútbol</label>
@@ -259,6 +287,68 @@ export default function CreateMatch() {
             onChange={handleChange}
             required
           />
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label className="form-label">Nivel requerido (opcional)</label>
+            <select
+              className="form-select"
+              name="level_required"
+              value={form.level_required}
+              onChange={handleChange}
+            >
+              <option value="">Sin requisito</option>
+              {Array.from({ length: 10 }).map((_, idx) => (
+                <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Visibilidad</label>
+            <select
+              className="form-select"
+              name="visibility"
+              value={form.visibility}
+              onChange={handleChange}
+            >
+              <option value="public">Público</option>
+              <option value="contacts_only">Solo contactos</option>
+              <option value="private">Privado</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label className="form-label">Precio por jugador (ARS)</label>
+          <input
+            type="number"
+            className="form-input"
+            name="price_per_player"
+            min="0"
+            step="100"
+            value={form.price_per_player}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div className="form-group" style={{ display: 'grid', gap: '0.6rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="checkbox"
+              checked={form.requires_approval}
+              onChange={() => handleCheckbox('requires_approval')}
+            />
+            Requiere aprobación del creador
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <input
+              type="checkbox"
+              checked={form.allow_waitlist}
+              onChange={() => handleCheckbox('allow_waitlist')}
+            />
+            Permitir lista de espera
+          </label>
         </div>
 
         {/* Description */}

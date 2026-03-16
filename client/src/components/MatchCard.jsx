@@ -46,9 +46,16 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
       <div className="match-card-header">
         <div className="match-type">
           <span className="match-type-icon">⚽</span>
-          <span className="match-type-label">Fútbol {match.football_type}</span>
+          <span className="match-type-label">{match.title || `Fútbol ${match.football_type}`}</span>
         </div>
         <span className="badge badge-type">F{match.football_type}</span>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+        {match.level_required && <span className="badge badge-type">Nivel {match.level_required}</span>}
+        {match.visibility === 'private' && <span className="badge badge-type">Privado</span>}
+        {match.visibility === 'contacts_only' && <span className="badge badge-type">Solo contactos</span>}
+        {Number(match.price_per_player || 0) > 0 && <span className="badge badge-featured">${Number(match.price_per_player).toLocaleString('es-AR')}</span>}
       </div>
 
       <div className="match-info">

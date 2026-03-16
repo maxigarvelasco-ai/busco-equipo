@@ -6,6 +6,7 @@ import MatchCard from '../components/MatchCard';
 import { useNavigate } from 'react-router-dom';
 
 const AREAS = ['Todas', 'Centro', 'Pichincha', 'Fisherton', 'Echesortu', 'Alberdi', 'Arroyito', 'Macrocentro'];
+const FOOTBALL_TYPES = ['Todas', '5', '7', '11'];
 
 export default function Feed() {
   const { user } = useAuth();
@@ -14,6 +15,8 @@ export default function Feed() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedArea, setSelectedArea] = useState('Todas');
+  const [selectedFootballType, setSelectedFootballType] = useState('Todas');
+  const [selectedLevel, setSelectedLevel] = useState('');
   const [toast, setToast] = useState(null);
   const [profileQuery, setProfileQuery] = useState('');
   const [profileResults, setProfileResults] = useState([]);
@@ -24,7 +27,12 @@ export default function Feed() {
   const loadMatches = useCallback(async (showSpinner = false) => {
     try {
       if (showSpinner) setIsLoading(true);
-      const data = await matchesAPI.getAll({ zone: selectedArea }, user?.id);
+      const filters = {
+        zone: selectedArea,
+        football_type: selectedFootballType === 'Todas' ? null : selectedFootballType,
+        level_required: selectedLevel || null,
+      };
+      const data = await matchesAPI.getAll(filters, user?.id);
       setMatches(data || []);
       setError(null);
     } catch (err) {
@@ -34,7 +42,7 @@ export default function Feed() {
       setIsLoading(false);
       setInitialLoad(false);
     }
-  }, [selectedArea, user]);
+  }, [selectedArea, selectedFootballType, selectedLevel, user]);
 
   useEffect(() => {
     loadMatches(true); // solo la primera vez muestra spinner
@@ -132,6 +140,31 @@ export default function Feed() {
         ))}
       </div>
 
+      <div className="area-filter" style={{ marginTop: '0.5rem' }}>
+        {FOOTBALL_TYPES.map(type => (
+          <button
+            key={type}
+            className={`area-pill ${selectedFootballType === type ? 'active' : ''}`}
+            onClick={() => setSelectedFootballType(type)}
+          >
+            {type === 'Todas' ? 'Todo fútbol' : `F${type}`}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+        <select
+          className="form-select"
+          value={selectedLevel}
+          onChange={(e) => setSelectedLevel(e.target.value)}
+        >
+          <option value="">Todos los niveles</option>
+          {Array.from({ length: 10 }).map((_, idx) => (
+            <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <div className="section-header" style={{ marginBottom: '0.75rem' }}>
           <span className="section-title">Buscar perfiles</span>
@@ -160,7 +193,12 @@ export default function Feed() {
                       {(p.name || '?').slice(0, 1).toUpperCase()}
                     </div>
                   )}
-                  <strong>{p.name || 'Sin nombre'}</strong>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <strong>{p.name || 'Sin nombre'}</strong>
+                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
+                      {[p.city, p.zone, p.preferred_position ? `Pos: ${p.preferred_position}` : null, p.skill_level ? `Nivel ${p.skill_level}` : null].filter(Boolean).join(' · ')}
+                    </span>
+                  </div>
                 </div>
                 <button className="btn btn-primary btn-sm" onClick={() => navigate(`/users/${p.id}`)}>Ver perfil</button>
               </div>

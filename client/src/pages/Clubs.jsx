@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { clubsAPI } from '../services/api';
+import { userTeamsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Clubs() {
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [teams, setTeams] = useState([]);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -16,8 +18,12 @@ export default function Clubs() {
   const loadClubs = async () => {
     try {
       setLoading(true);
-      const data = await clubsAPI.getAll();
+      const [data, teamData] = await Promise.all([
+        clubsAPI.getAll(),
+        userTeamsAPI.getAll({ is_recruiting: true }).catch(() => []),
+      ]);
       setClubs(data);
+      setTeams(teamData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -27,6 +33,8 @@ export default function Clubs() {
 
   const [showCreate, setShowCreate] = useState(false);
   const [newClub, setNewClub] = useState({ name: '', city: '', description: '' });
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [newTeam, setNewTeam] = useState({ name: '', city: '', zone: '', football_type: '5', level: '', description: '', is_recruiting: true });
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -40,17 +48,49 @@ export default function Clubs() {
     }
   };
 
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
+    try {
+      await userTeamsAPI.create(newTeam);
+      setShowCreateTeam(false);
+      setNewTeam({ name: '', city: '', zone: '', football_type: '5', level: '', description: '', is_recruiting: true });
+      loadClubs();
+    } catch (err) {
+      alert(err.message || 'Error al crear equipo');
+    }
+  };
+
+  const handleRequestJoinTeam = async (teamId) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    try {
+      await userTeamsAPI.requestJoin(teamId);
+      alert('Solicitud enviada al capitán');
+    } catch (err) {
+      alert(err.message || 'No se pudo enviar la solicitud');
+    }
+  };
+
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;
 
   return (
     <div className="page-content" style={{ paddingBottom: '80px' }}>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h1 className="page-title">Clubes</h1>
-        {user && (
-          <button className="btn btn-sm btn-primary" onClick={() => setShowCreate(!showCreate)}>
-            + Crear Club
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {user && (
+            <button className="btn btn-sm btn-primary" onClick={() => setShowCreate(!showCreate)}>
+              + Crear Club
+            </button>
+          )}
+          {user && (
+            <button className="btn btn-sm btn-secondary" onClick={() => setShowCreateTeam(!showCreateTeam)}>
+              + Crear Equipo
+            </button>
+          )}
+        </div>
       </div>
 
       {showCreate && (
@@ -70,6 +110,74 @@ export default function Clubs() {
           </div>
           <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar Club</button>
         </form>
+      )}
+
+      {showCreateTeam && (
+        <form onSubmit={handleCreateTeam} className="card" style={{ marginBottom: '1rem', background: '#f5f5f5' }}>
+          <h3>Crear Equipo de Jugadores</h3>
+          <div className="form-group">
+            <label>Nombre del Equipo</label>
+            <input required className="form-input" value={newTeam.name} onChange={e => setNewTeam({ ...newTeam, name: e.target.value })} />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Ciudad</label>
+              <input className="form-input" value={newTeam.city} onChange={e => setNewTeam({ ...newTeam, city: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label>Zona</label>
+              <input className="form-input" value={newTeam.zone} onChange={e => setNewTeam({ ...newTeam, zone: e.target.value })} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Formato</label>
+              <select className="form-select" value={newTeam.football_type} onChange={e => setNewTeam({ ...newTeam, football_type: e.target.value })}>
+                <option value="5">Fútbol 5</option>
+                <option value="7">Fútbol 7</option>
+                <option value="11">Fútbol 11</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Nivel</label>
+              <select className="form-select" value={newTeam.level} onChange={e => setNewTeam({ ...newTeam, level: e.target.value })}>
+                <option value="">No definido</option>
+                {Array.from({ length: 10 }).map((_, idx) => (
+                  <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Descripción</label>
+            <textarea className="form-input" value={newTeam.description} onChange={e => setNewTeam({ ...newTeam, description: e.target.value })} />
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <input type="checkbox" checked={newTeam.is_recruiting} onChange={e => setNewTeam({ ...newTeam, is_recruiting: e.target.checked })} />
+            Equipo abierto a reclutar jugadores
+          </label>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Guardar Equipo</button>
+        </form>
+      )}
+
+      {teams.length > 0 && (
+        <div style={{ marginBottom: '1rem' }}>
+          <h3 style={{ marginBottom: '0.8rem' }}>Equipos buscando jugadores</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+            {teams.map((t) => (
+              <div key={t.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{t.name}</div>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+                    {[t.city, t.zone, t.football_type ? `F${t.football_type}` : null, t.level ? `Nivel ${t.level}` : null].filter(Boolean).join(' · ')}
+                  </div>
+                  {t.description && <div style={{ marginTop: '0.35rem' }}>{t.description}</div>}
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => handleRequestJoinTeam(t.id)}>Solicitar</button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {clubs.length === 0 ? (
