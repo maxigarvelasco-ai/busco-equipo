@@ -161,10 +161,24 @@ a:hover { color: var(--color-primary-light); }
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--space-xl);
+  padding: var(--space-lg);
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+}
+
+.skeleton-card {
+  height: 138px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.08) 0%, rgba(148, 163, 184, 0.16) 50%, rgba(148, 163, 184, 0.08) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.25s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .card:hover {

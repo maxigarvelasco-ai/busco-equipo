@@ -7,6 +7,7 @@ export default function Navbar() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -35,15 +36,15 @@ export default function Navbar() {
         <span>Partidos</span>
       </NavLink>
 
-      <NavLink to="/fields" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink to="/venues" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
         <span className="nav-icon">🏟️</span>
         <span>Canchas</span>
       </NavLink>
 
       <button
         className="nav-item nav-create"
-        onClick={() => user ? navigate('/create-match') : navigate('/login')}
-        aria-label="Crear partido"
+        onClick={() => user ? setShowCreateMenu((v) => !v) : navigate('/login')}
+        aria-label="Crear"
       >
         <span>+</span>
       </button>
@@ -75,6 +76,20 @@ export default function Navbar() {
         <span className="nav-icon">👤</span>
         <span>{user ? 'Perfil' : 'Entrar'}</span>
       </NavLink>
+
+      {showCreateMenu && user && (
+        <div style={{ position: 'fixed', bottom: 74, left: '50%', transform: 'translateX(-50%)', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '0.5rem', display: 'grid', gap: '0.4rem', zIndex: 200 }}>
+          <button className="btn btn-primary btn-sm" onClick={() => { setShowCreateMenu(false); navigate('/create-match'); }}>
+            Crear partido
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => { setShowCreateMenu(false); navigate('/clubs', { state: { openCreateTeam: true } }); }}>
+            Crear equipo
+          </button>
+          <button className="btn btn-secondary btn-sm" onClick={() => { setShowCreateMenu(false); navigate('/clubs', { state: { openCreateClub: true } }); }}>
+            Crear club
+          </button>
+        </div>
+      )}
     </nav>
   );
 }

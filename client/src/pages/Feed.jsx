@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { supabase } from '../services/supabaseClient';
-import { matchesAPI, profilesAPI } from '../services/api';
+import { matchesAPI, userTeamsAPI, tournamentsAPI } from '../services/api';
 import MatchCard from '../components/MatchCard';
 import { useNavigate } from 'react-router-dom';
 
 const AREAS = ['Todas', 'Centro', 'Pichincha', 'Fisherton', 'Echesortu', 'Alberdi', 'Arroyito', 'Macrocentro'];
 const FOOTBALL_TYPES = ['Todas', '5', '7', '11'];
+const MATCH_KINDS = [
+  { id: 'all', label: 'Todos' },
+  { id: 'recreativo', label: '🟢 Recreativo' },
+  { id: 'competitivo', label: '🟡 Competitivo' },
+  { id: 'torneo', label: '🔴 Torneo' },
+];
 
 export default function Feed() {
   const { user } = useAuth();
@@ -16,13 +21,11 @@ export default function Feed() {
   const [error, setError] = useState(null);
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [selectedFootballType, setSelectedFootballType] = useState('Todas');
-  const [selectedLevel, setSelectedLevel] = useState('');
+  const [selectedMatchKind, setSelectedMatchKind] = useState('all');
+  const [selectedDateFilter, setSelectedDateFilter] = useState('today');
   const [toast, setToast] = useState(null);
-  const [profileQuery, setProfileQuery] = useState('');
-  const [profileResults, setProfileResults] = useState([]);
-  const [searchingProfiles, setSearchingProfiles] = useState(false);
-
-  const [initialLoad, setInitialLoad] = useState(true);
+  const [teams, setTeams] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
 
   const loadMatches = useCallback(async (showSpinner = false) => {
     try {
@@ -30,19 +33,24 @@ export default function Feed() {
       const filters = {
         zone: selectedArea,
         football_type: selectedFootballType === 'Todas' ? null : selectedFootballType,
-        level_required: selectedLevel || null,
+        match_kind: selectedMatchKind === 'all' ? null : selectedMatchKind,
       };
-      const data = await matchesAPI.getAll(filters, user?.id);
+      const [data, teamsData, tournamentsData] = await Promise.all([
+        matchesAPI.getAll(filters, user?.id),
+        userTeamsAPI.getAll({ is_recruiting: true }).catch(() => []),
+        tournamentsAPI.getAll().catch(() => []),
+      ]);
       setMatches(data || []);
+      setTeams(teamsData || []);
+      setTournaments(tournamentsData || []);
       setError(null);
     } catch (err) {
       console.error("Error loading matches:", err);
       setError("No se pudieron cargar los partidos.");
     } finally {
       setIsLoading(false);
-      setInitialLoad(false);
     }
-  }, [selectedArea, selectedFootballType, selectedLevel, user]);
+  }, [selectedArea, selectedFootballType, selectedMatchKind, user]);
 
   useEffect(() => {
     loadMatches(true); // solo la primera vez muestra spinner
@@ -105,18 +113,34 @@ export default function Feed() {
     }
   };
 
-  const handleSearchProfiles = async () => {
-    try {
-      setSearchingProfiles(true);
-      const results = await profilesAPI.searchProfiles(profileQuery, user?.id);
-      setProfileResults(results);
-    } catch (err) {
-      console.error('Error searching profiles:', err);
-      showToast('No se pudieron buscar perfiles', 'error');
-    } finally {
-      setSearchingProfiles(false);
-    }
+  const toLocalDate = (dateStr) => {
+    const [y, m, d] = String(dateStr || '').split('-').map(Number);
+    if (!y || !m || !d) return new Date(dateStr);
+    return new Date(y, m - 1, d);
   };
+
+  const filteredByDate = (matches || []).filter((m) => {
+    if (!m.match_date) return true;
+    const date = toLocalDate(m.match_date);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endWeek = new Date(today);
+    endWeek.setDate(today.getDate() + 7);
+
+    if (selectedDateFilter === 'today') {
+      return date.toDateString() === today.toDateString();
+    }
+    if (selectedDateFilter === 'week') {
+      return date >= today && date <= endWeek;
+    }
+    return true;
+  });
+
+  const seArma = matchesAPI.getSeArma(filteredByDate).slice(0, 3);
+  const upcomingTournaments = (tournaments || []).filter((t) => {
+    if (!t.start_date) return false;
+    return toLocalDate(t.start_date) >= new Date(new Date().setHours(0, 0, 0, 0));
+  }).slice(0, 4);
 
   return (
     <div className="page-content">
@@ -126,6 +150,33 @@ export default function Feed() {
 
       <div className="page-header">
         <h1 className="page-title">Partidos</h1>
+      </div>
+
+      <div className="card" style={{ marginBottom: '0.9rem', padding: '0.85rem' }}>
+        <div style={{ display: 'grid', gap: '0.65rem' }}>
+          <div className="area-filter" style={{ marginTop: 0 }}>
+            {['today', 'week', 'all'].map((f) => (
+              <button
+                key={f}
+                className={`area-pill ${selectedDateFilter === f ? 'active' : ''}`}
+                onClick={() => setSelectedDateFilter(f)}
+              >
+                {f === 'today' ? '📅 Hoy' : f === 'week' ? '🗓 Esta semana' : 'Todos'}
+              </button>
+            ))}
+          </div>
+          <div className="area-filter" style={{ marginTop: 0 }}>
+            {MATCH_KINDS.map((kind) => (
+              <button
+                key={kind.id}
+                className={`area-pill ${selectedMatchKind === kind.id ? 'active' : ''}`}
+                onClick={() => setSelectedMatchKind(kind.id)}
+              >
+                {kind.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="area-filter">
@@ -152,69 +203,40 @@ export default function Feed() {
         ))}
       </div>
 
-      <div style={{ marginTop: '0.5rem', marginBottom: '0.75rem' }}>
-        <select
-          className="form-select"
-          value={selectedLevel}
-          onChange={(e) => setSelectedLevel(e.target.value)}
-        >
-          <option value="">Todos los niveles</option>
-          {Array.from({ length: 10 }).map((_, idx) => (
-            <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-header" style={{ marginBottom: '0.75rem' }}>
-          <span className="section-title">Buscar perfiles</span>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <input
-            className="form-input"
-            style={{ flex: 1 }}
-            placeholder="Nombre de usuario"
-            value={profileQuery}
-            onChange={(e) => setProfileQuery(e.target.value)}
-          />
-          <button className="btn btn-secondary" onClick={handleSearchProfiles} disabled={searchingProfiles}>
-            {searchingProfiles ? 'Buscando...' : 'Buscar'}
-          </button>
-        </div>
-        {profileResults.length > 0 && (
-          <div style={{ display: 'grid', gap: '0.5rem' }}>
-            {profileResults.map((p) => (
-              <div key={p.id} className="card" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  {p.avatar_url ? (
-                    <img src={p.avatar_url} alt={p.name} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#ddd', display: 'grid', placeItems: 'center' }}>
-                      {(p.name || '?').slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <strong>{p.name || 'Sin nombre'}</strong>
-                    <span style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>
-                      {[p.city, p.zone, p.preferred_position ? `Pos: ${p.preferred_position}` : null, p.skill_level ? `Nivel ${p.skill_level}` : null].filter(Boolean).join(' · ')}
-                    </span>
-                  </div>
-                </div>
-                <button className="btn btn-primary btn-sm" onClick={() => navigate(`/users/${p.id}`)}>Ver perfil</button>
-              </div>
+      {seArma.length > 0 && (
+        <div className="card" style={{ marginBottom: '1rem', padding: '0.9rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+            <strong>⚡ Se arma</strong>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: '0.78rem' }}>Urgente</span>
+          </div>
+          <div style={{ display: 'grid', gap: '0.6rem' }}>
+            {seArma.map((m) => (
+              <button
+                key={m.id}
+                className="btn btn-secondary"
+                style={{ justifyContent: 'space-between', width: '100%' }}
+                onClick={() => navigate(`/match/${m.id}`)}
+              >
+                <span>{`⚽ F${m.football_type} · ${m.zone || 'Sin zona'}`}</span>
+                <span>{`${m.players_joined ?? m.current_players ?? 0}/${m.max_players}`}</span>
+              </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {isLoading ? (
-        <div className="loading-spinner"><div className="spinner"></div></div>
+        <div style={{ display: 'grid', gap: '0.8rem' }}>
+          <div className="skeleton-card"></div>
+          <div className="skeleton-card"></div>
+          <div className="skeleton-card"></div>
+        </div>
       ) : error ? (
         <div className="empty-state">
           <div className="empty-state-icon">⚠️</div>
           <div className="empty-state-title">{error}</div>
         </div>
-      ) : matches.length === 0 ? (
+      ) : filteredByDate.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">⚽</div>
           <div className="empty-state-title">No hay partidos en esta zona</div>
@@ -226,7 +248,7 @@ export default function Feed() {
           </button>
         </div>
       ) : (
-        matches.map(match => (
+        filteredByDate.map(match => (
           <div key={match.id} style={{ cursor: 'pointer' }}>
             <MatchCard
               match={match}
@@ -240,6 +262,44 @@ export default function Feed() {
             />
           </div>
         ))
+      )}
+
+      {teams.length > 0 && (
+        <div className="card" style={{ marginTop: '1rem', padding: '0.9rem' }}>
+          <strong style={{ display: 'block', marginBottom: '0.7rem' }}>🛡 Equipos buscando jugadores</strong>
+          <div style={{ display: 'grid', gap: '0.6rem' }}>
+            {teams.slice(0, 3).map((t) => (
+              <div key={t.id} className="card" style={{ padding: '0.7rem' }}>
+                <div style={{ fontWeight: 700 }}>{t.name}</div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>
+                  {[t.city, t.zone, t.football_type ? `F${t.football_type}` : null].filter(Boolean).join(' · ')}
+                </div>
+                <button className="btn btn-primary btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => navigate('/clubs')}>
+                  Ver equipos
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {upcomingTournaments.length > 0 && (
+        <div className="card" style={{ marginTop: '1rem', padding: '0.9rem' }}>
+          <strong style={{ display: 'block', marginBottom: '0.7rem' }}>🏆 Torneos abiertos</strong>
+          <div style={{ display: 'grid', gap: '0.6rem' }}>
+            {upcomingTournaments.map((t) => (
+              <div key={t.id} className="card" style={{ padding: '0.7rem' }}>
+                <div style={{ fontWeight: 700 }}>{t.name}</div>
+                <div style={{ color: 'var(--color-text-muted)', fontSize: '0.82rem' }}>
+                  {[t.city, t.zone, t.start_date ? new Date(t.start_date).toLocaleDateString('es-AR') : null].filter(Boolean).join(' · ')}
+                </div>
+                <button className="btn btn-secondary btn-sm" style={{ marginTop: '0.5rem' }} onClick={() => navigate('/tournaments')}>
+                  Ver torneos
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

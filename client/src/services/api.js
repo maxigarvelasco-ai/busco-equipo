@@ -18,8 +18,8 @@ export const matchesAPI = {
     if (filters.visibility && filters.visibility !== 'all') {
       query = query.eq('visibility', filters.visibility);
     }
-    if (filters.level_required) {
-      query = query.eq('level_required', parseInt(filters.level_required));
+    if (filters.match_kind) {
+      query = query.eq('match_kind', filters.match_kind);
     }
 
     query = query.order('is_featured', { ascending: false })
@@ -119,7 +119,7 @@ export const matchesAPI = {
         match_date: matchData.match_date,
         match_time: matchData.match_time,
         max_players: matchData.max_players,
-        level_required: matchData.level_required || null,
+        match_kind: matchData.match_kind || 'recreativo',
         visibility: matchData.visibility || 'public',
         requires_approval: typeof matchData.requires_approval === 'boolean' ? matchData.requires_approval : true,
         allow_waitlist: typeof matchData.allow_waitlist === 'boolean' ? matchData.allow_waitlist : true,
@@ -345,6 +345,15 @@ export const matchesAPI = {
       .from('featured_matches')
       .insert({ match_id: matchId, expires_at: expiresAt });
     if (error) throw error;
+  },
+
+  getSeArma(matches) {
+    return (matches || []).filter((m) => {
+      const joined = m.players_joined ?? m.current_players ?? 0;
+      const max = m.max_players || 0;
+      if (!max) return false;
+      return max - joined <= 2 && joined < max;
+    });
   },
 
   async confirmAttendance(matchId, status = 'confirmed') {
@@ -892,7 +901,6 @@ export const userTeamsAPI = {
       city: teamData.city || null,
       zone: teamData.zone || null,
       football_type: teamData.football_type ? parseInt(teamData.football_type) : null,
-      level: teamData.level ? parseInt(teamData.level) : null,
       description: teamData.description || null,
       is_public: teamData.is_public !== false,
       is_recruiting: !!teamData.is_recruiting,

@@ -20,7 +20,7 @@ export default function CreateMatch() {
     match_date: new Date().toISOString().split('T')[0],
     match_time: '21:00',
     max_players: '10',
-    level_required: '',
+    match_kind: 'recreativo',
     visibility: 'public',
     requires_approval: true,
     allow_waitlist: true,
@@ -130,7 +130,7 @@ export default function CreateMatch() {
         match_date: form.match_date,
         match_time: form.match_time,
         max_players: parseInt(form.max_players),
-        level_required: form.level_required ? parseInt(form.level_required) : null,
+        match_kind: form.match_kind,
         visibility: form.visibility,
         requires_approval: form.requires_approval,
         allow_waitlist: form.allow_waitlist,
@@ -291,17 +291,16 @@ export default function CreateMatch() {
 
         <div className="form-row">
           <div className="form-group">
-            <label className="form-label">Nivel requerido (opcional)</label>
+            <label className="form-label">Tipo de partido</label>
             <select
               className="form-select"
-              name="level_required"
-              value={form.level_required}
+              name="match_kind"
+              value={form.match_kind}
               onChange={handleChange}
             >
-              <option value="">Sin requisito</option>
-              {Array.from({ length: 10 }).map((_, idx) => (
-                <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
-              ))}
+              <option value="recreativo">🟢 Recreativo</option>
+              <option value="competitivo">🟡 Competitivo</option>
+              <option value="torneo">🔴 Torneo</option>
             </select>
           </div>
           <div className="form-group">

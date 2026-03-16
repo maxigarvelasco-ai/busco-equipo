@@ -104,7 +104,9 @@ export default function Venues() {
               )}
             </div>
             <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+              <button className="btn btn-secondary btn-sm">Ver horarios</button>
               <button className="btn btn-primary btn-sm">Reservar</button>
+              <button className="btn btn-secondary btn-sm">Ver torneos</button>
               {venue.phone && (
                 <a href={`tel:${venue.phone}`} className="btn btn-secondary btn-sm">Llamar</a>
               )}

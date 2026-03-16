@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { clubsAPI } from '../services/api';
 import { userTeamsAPI } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Clubs() {
@@ -9,6 +9,7 @@ export default function Clubs() {
   const [loading, setLoading] = useState(true);
   const [teams, setTeams] = useState([]);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   useEffect(() => {
@@ -34,7 +35,16 @@ export default function Clubs() {
   const [showCreate, setShowCreate] = useState(false);
   const [newClub, setNewClub] = useState({ name: '', city: '', description: '' });
   const [showCreateTeam, setShowCreateTeam] = useState(false);
-  const [newTeam, setNewTeam] = useState({ name: '', city: '', zone: '', football_type: '5', level: '', description: '', is_recruiting: true });
+  const [newTeam, setNewTeam] = useState({ name: '', city: '', zone: '', football_type: '5', description: '', is_recruiting: true });
+
+  useEffect(() => {
+    if (location.state?.openCreateTeam) {
+      setShowCreateTeam(true);
+    }
+    if (location.state?.openCreateClub) {
+      setShowCreate(true);
+    }
+  }, [location.state]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -53,7 +63,7 @@ export default function Clubs() {
     try {
       await userTeamsAPI.create(newTeam);
       setShowCreateTeam(false);
-      setNewTeam({ name: '', city: '', zone: '', football_type: '5', level: '', description: '', is_recruiting: true });
+      setNewTeam({ name: '', city: '', zone: '', football_type: '5', description: '', is_recruiting: true });
       loadClubs();
     } catch (err) {
       alert(err.message || 'Error al crear equipo');
@@ -138,15 +148,6 @@ export default function Clubs() {
                 <option value="11">Fútbol 11</option>
               </select>
             </div>
-            <div className="form-group">
-              <label>Nivel</label>
-              <select className="form-select" value={newTeam.level} onChange={e => setNewTeam({ ...newTeam, level: e.target.value })}>
-                <option value="">No definido</option>
-                {Array.from({ length: 10 }).map((_, idx) => (
-                  <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
-                ))}
-              </select>
-            </div>
           </div>
           <div className="form-group">
             <label>Descripción</label>
@@ -169,11 +170,18 @@ export default function Clubs() {
                 <div>
                   <div style={{ fontWeight: 700 }}>{t.name}</div>
                   <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-                    {[t.city, t.zone, t.football_type ? `F${t.football_type}` : null, t.level ? `Nivel ${t.level}` : null].filter(Boolean).join(' · ')}
+                    {[t.city, t.zone, t.football_type ? `F${t.football_type}` : null].filter(Boolean).join(' · ')}
+                  </div>
+                  <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                    👥 Plantel abierto · 🏆 Amateur
                   </div>
                   {t.description && <div style={{ marginTop: '0.35rem' }}>{t.description}</div>}
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => handleRequestJoinTeam(t.id)}>Solicitar</button>
+                <div style={{ display: 'grid', gap: '0.35rem' }}>
+                  <button className="btn btn-primary btn-sm" onClick={() => handleRequestJoinTeam(t.id)}>Ver plantel</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleRequestJoinTeam(t.id)}>Buscar jugadores</button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => navigate('/')}>Ver partidos</button>
+                </div>
               </div>
             ))}
           </div>
@@ -188,7 +196,7 @@ export default function Clubs() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {clubs.map(c => (
-             <div key={c.id} className="card match-card animate-in" onClick={() => navigate(`/clubs/${c.id}`)} style={{ cursor: 'pointer' }}>
+             <div key={c.id} className="card match-card animate-in" style={{ cursor: 'pointer' }}>
                <div className="match-card-header">
                  <div className="match-type">
                    <span className="match-type-icon">🛡️</span>
@@ -200,12 +208,21 @@ export default function Clubs() {
                    <span className="info-icon">📍</span>
                    <span>{c.city}</span>
                  </div>
+                 <div className="match-info-row">
+                   <span className="info-icon">🏆</span>
+                   <span>Liga amateur</span>
+                 </div>
                  {c.description && (
                    <div className="match-info-row">
                      <span className="info-icon">💬</span>
                      <span style={{ opacity: 0.8 }}>{c.description}</span>
                    </div>
                  )}
+               </div>
+               <div style={{ display: 'flex', gap: '0.45rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+                 <button className="btn btn-primary btn-sm" onClick={() => navigate(`/clubs/${c.id}`)}>Ver plantel</button>
+                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/clubs', { state: { openCreateTeam: true } })}>Buscar jugadores</button>
+                 <button className="btn btn-secondary btn-sm" onClick={() => navigate('/')}>Ver partidos</button>
                </div>
              </div>
           ))}

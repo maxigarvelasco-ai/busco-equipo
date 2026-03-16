@@ -20,7 +20,6 @@ export default function Profile() {
     zone: '',
     preferred_position: '',
     preferred_foot: '',
-    skill_level: '',
     bio: '',
     phone: '',
     is_profile_public: true,
@@ -38,7 +37,6 @@ export default function Profile() {
       zone: profile.zone || '',
       preferred_position: profile.preferred_position || '',
       preferred_foot: profile.preferred_foot || '',
-      skill_level: profile.skill_level || '',
       bio: profile.bio || '',
       phone: profile.phone || '',
       is_profile_public: profile.is_profile_public !== false,
@@ -73,7 +71,6 @@ export default function Profile() {
         zone: editForm.zone || null,
         preferred_position: editForm.preferred_position || null,
         preferred_foot: editForm.preferred_foot || null,
-        skill_level: editForm.skill_level ? parseInt(editForm.skill_level) : null,
         bio: editForm.bio || null,
         phone: editForm.phone || null,
         is_profile_public: !!editForm.is_profile_public,
@@ -146,15 +143,6 @@ export default function Profile() {
             <div className="form-group">
               <label className="form-label">Nombre</label>
               <input className="form-input" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Nivel</label>
-              <select className="form-select" value={editForm.skill_level} onChange={(e) => setEditForm((p) => ({ ...p, skill_level: e.target.value }))}>
-                <option value="">No definido</option>
-                {Array.from({ length: 10 }).map((_, idx) => (
-                  <option key={idx + 1} value={idx + 1}>Nivel {idx + 1}</option>
-                ))}
-              </select>
             </div>
           </div>
 
