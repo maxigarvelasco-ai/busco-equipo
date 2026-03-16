@@ -119,10 +119,23 @@ export const matchesAPI = {
   async getJoinRequests(matchId) {
     const { data, error } = await supabase
       .from('match_join_requests')
-      .select('*, profiles:user_id(name, avatar_url, ranking)')
+      .select('*')
       .eq('match_id', matchId)
       .eq('status', 'pending');
     if (error) throw error;
+
+    if (data && data.length > 0) {
+      const userIds = Array.from(new Set(data.map(r => r.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url, ranking')
+          .in('id', userIds);
+        const map = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+        data.forEach(r => { r.profiles = map[r.user_id] || null; });
+      }
+    }
+
     return data || [];
   },
 
@@ -207,9 +220,22 @@ export const matchesAPI = {
   async getPlayers(matchId) {
     const { data, error } = await supabase
       .from('match_players')
-      .select('*, profiles:user_id(name, avatar_url, ranking)')
+      .select('*')
       .eq('match_id', matchId);
     if (error) throw error;
+
+    if (data && data.length > 0) {
+      const userIds = Array.from(new Set(data.map(p => p.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url, ranking')
+          .in('id', userIds);
+        const map = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+        data.forEach(r => { r.profiles = map[r.user_id] || null; });
+      }
+    }
+
     return data || [];
   },
 
@@ -232,10 +258,23 @@ export const matchesAPI = {
   async getMessages(matchId) {
     const { data, error } = await supabase
       .from('match_messages')
-      .select('*, profiles:user_id(name, avatar_url)')
+      .select('*')
       .eq('match_id', matchId)
       .order('created_at', { ascending: true });
     if (error) throw error;
+
+    if (data && data.length > 0) {
+      const userIds = Array.from(new Set(data.map(m => m.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', userIds);
+        const map = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+        data.forEach(m => { m.profiles = map[m.user_id] || null; });
+      }
+    }
+
     return data || [];
   },
 
@@ -519,9 +558,22 @@ export const clubsAPI = {
   async getMembers(clubId) {
     const { data, error } = await supabase
       .from('club_members')
-      .select('*, profiles:user_id(name, avatar_url)')
+      .select('*')
       .eq('club_id', clubId);
     if (error) throw error;
+
+    if (data && data.length > 0) {
+      const userIds = Array.from(new Set(data.map(m => m.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', userIds);
+        const map = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+        data.forEach(r => { r.profiles = map[r.user_id] || null; });
+      }
+    }
+
     return data || [];
   },
 
