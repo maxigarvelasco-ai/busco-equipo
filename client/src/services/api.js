@@ -177,11 +177,14 @@ export const matchesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
     try {
-      const { error } = await supabase.rpc('request_join_match', { 
+      const { data, error } = await supabase.rpc('request_join_match', { 
         p_match_id: matchId, 
         p_user_id: session.user.id 
       });
       if (error) throw error;
+      if (data && typeof data === 'object' && data.alreadyRequested) {
+        return { ok: false, alreadyRequested: true };
+      }
       return { ok: true };
     } catch (err) {
       // RPC raises a descriptive error when a duplicate request exists
@@ -255,10 +258,7 @@ export const matchesAPI = {
 
   // Delete a match (organizer or admin only). Calls RPC `delete_match` created on the DB.
   async deleteMatch(matchId) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Debes iniciar sesión');
-
-    const { error } = await supabase.rpc('delete_match', { p_match_id: matchId, p_requester_id: session.user.id });
+    const { error } = await supabase.rpc('delete_match', { p_match_id: matchId });
     if (error) throw error;
   },
 

@@ -45,8 +45,12 @@ export default function Feed() {
   const handleJoin = async (matchId) => {
     if (!user) { navigate('/login'); return; }
     try {
-      await matchesAPI.requestJoin(matchId);
-      showToast('¡Solicitud enviada! 🎉');
+      const res = await matchesAPI.requestJoin(matchId);
+      if (res?.alreadyRequested) {
+        showToast('Ya tenías una solicitud pendiente', 'error');
+      } else {
+        showToast('¡Solicitud enviada! 🎉');
+      }
       loadMatches(false); // recarga silenciosa
     } catch (err) {
       showToast(err.message || 'Error al solicitar unirse', 'error');

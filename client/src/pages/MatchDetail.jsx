@@ -19,6 +19,14 @@ export default function MatchDetail() {
   const [activeTab, setActiveTab] = useState(state?.openTab || 'info'); // info, chat, requests
   const [loading, setLoading] = useState(true);
 
+  const appendMessageUnique = (msg) => {
+    if (!msg?.id) return;
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+  };
+
   useEffect(() => {
     loadMatchData();
     
@@ -28,7 +36,7 @@ export default function MatchDetail() {
         try {
           const n = payload?.new || payload?.record || null;
           if (!n) return;
-          setMessages(prev => [...prev, n]);
+          appendMessageUnique(n);
         } catch (e) { console.error('Realtime message handler error', e); }
       })
       .subscribe();
@@ -101,7 +109,7 @@ export default function MatchDetail() {
     if (!newMessage.trim() || !user) return;
     try {
       const inserted = await matchesAPI.sendMessage(id, newMessage);
-      if (inserted) setMessages(prev => [...prev, inserted]);
+      appendMessageUnique(inserted);
       setNewMessage('');
     } catch (err) {
       console.error(err);

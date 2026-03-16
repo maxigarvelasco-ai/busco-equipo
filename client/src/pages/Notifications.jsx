@@ -222,7 +222,7 @@ export default function Notifications() {
                 {notificationIcons[notif.type] || notificationIcons.default}
               </div>
               <div className="notification-content">
-                <p>{notif.content || notif.message}</p>
+                <p>{notif.message || notif.content}</p>
                 <span className="notification-date">
                   {new Date(notif.created_at).toLocaleString()}
                 </span>
