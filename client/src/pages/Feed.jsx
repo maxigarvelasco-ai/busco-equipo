@@ -68,6 +68,37 @@ export default function Feed() {
     }
   };
 
+  const handleLeave = async (matchId) => {
+    try {
+      await matchesAPI.leave(matchId);
+      showToast('Saliste del partido');
+      loadMatches(false);
+    } catch (err) {
+      showToast(err.message || 'Error al salir', 'error');
+    }
+  };
+
+  const handleCancel = async (matchId) => {
+    try {
+      await matchesAPI.cancelRequest(matchId);
+      showToast('Solicitud cancelada');
+      loadMatches(false);
+    } catch (err) {
+      showToast(err.message || 'Error al cancelar solicitud', 'error');
+    }
+  };
+
+  const handleDelete = async (matchId) => {
+    if (!confirm('Seguro queres eliminar este partido?')) return;
+    try {
+      await matchesAPI.deleteMatch(matchId);
+      showToast('Partido eliminado');
+      loadMatches(false);
+    } catch (err) {
+      showToast(err.message || 'Error al eliminar partido', 'error');
+    }
+  };
+
   const handleApplyTournament = async (tournamentId) => {
     if (!user) { navigate('/login'); return; }
     try {
@@ -212,9 +243,51 @@ export default function Feed() {
 
             <div className="match-card-footer">
               {req.kind === 'Match' ? (
-                <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleJoin(req.id); }}>
-                  Unirme
-                </button>
+                (() => {
+                  const m = req.raw || {};
+                  const playersJoined = m.players_joined ?? m.current_players ?? 0;
+                  const maxPlayers = m.max_players || 0;
+                  const isFull = maxPlayers > 0 && playersJoined >= maxPlayers;
+                  const matchCreatorId = m.owner_id ?? m.creator_id ?? null;
+                  const isCreator = Boolean(user?.id && matchCreatorId && String(user.id) === String(matchCreatorId));
+
+                  if (isCreator) {
+                    return (
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <span className="badge badge-type">TU PARTIDO</span>
+                        <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
+                          Eliminar
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (m.has_joined) {
+                    return (
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleLeave(req.id); }}>
+                        Salir
+                      </button>
+                    );
+                  }
+
+                  if (m.has_requested) {
+                    return (
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleCancel(req.id); }}>
+                        Cancelar solicitud
+                      </button>
+                    );
+                  }
+
+                  if (isFull) {
+                    return <span className="badge badge-full">Completo</span>;
+                  }
+
+                  return (
+                    <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleJoin(req.id); }}>
+                      Unirme
+                    </button>
+                  );
+                })()
               ) : (
                 <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApplyTournament(req.id); }}>
                   Postularse
