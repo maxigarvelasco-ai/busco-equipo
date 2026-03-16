@@ -21,6 +21,7 @@ export default function Venues() {
     services: [],
   });
   const [citySuggestions, setCitySuggestions] = useState([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
   const canManageVenues = user && profile?.profile_type === 'venue_member';
 
@@ -81,15 +82,20 @@ export default function Venues() {
         const data = await res.json();
         if (cancelled) return;
 
-        const names = Array.from(
-          new Set(
-            (data || [])
-              .map((item) => item?.address?.city || item?.address?.town || item?.address?.village || item?.display_name?.split(',')?.[0])
-              .filter(Boolean)
-          )
-        ).slice(0, 6);
+        const normalizedQuery = query.toLowerCase();
+        const rawLabels = (data || []).map((item) => {
+          const city = item?.address?.city || item?.address?.town || item?.address?.village;
+          const road = item?.address?.road;
+          const first = item?.display_name?.split(',')?.[0];
+          return city || road || first || '';
+        }).filter(Boolean);
+
+        const startsWith = rawLabels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
+        const fallback = rawLabels.filter((label) => label.toLowerCase().includes(normalizedQuery));
+        const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
 
         setCitySuggestions(names);
+        setShowCitySuggestions(true);
       } catch {
         if (!cancelled) setCitySuggestions([]);
       }
@@ -130,7 +136,29 @@ export default function Venues() {
           </div>
           <div className="form-group">
             <label className="form-label">Ciudad</label>
-            <input className="form-input" list="venue-city-options" value={form.city} onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))} required />
+            <input
+              className="form-input"
+              value={form.city}
+              onFocus={() => setShowCitySuggestions(true)}
+              onBlur={() => setTimeout(() => setShowCitySuggestions(false), 120)}
+              onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
+              required
+            />
+            {showCitySuggestions && citySuggestions.length > 0 && (
+              <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
+                {citySuggestions.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
+                    onMouseDown={() => setForm((p) => ({ ...p, city }))}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -159,11 +187,6 @@ export default function Venues() {
             {creating ? 'Guardando...' : 'Guardar cancha'}
           </button>
 
-          <datalist id="venue-city-options">
-            {citySuggestions.map((city) => (
-              <option key={city} value={city} />
-            ))}
-          </datalist>
         </form>
       )}
 

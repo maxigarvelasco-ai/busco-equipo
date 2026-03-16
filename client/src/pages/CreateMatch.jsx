@@ -26,6 +26,7 @@ export default function CreateMatch() {
     description: '',
   });
   const [citySuggestions, setCitySuggestions] = useState([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
   const currentCityQuery = requestType === 'casual_match' ? matchForm.city : tournamentForm.city;
 
@@ -49,15 +50,20 @@ export default function CreateMatch() {
         const data = await res.json();
         if (cancelled) return;
 
-        const names = Array.from(
-          new Set(
-            (data || [])
-              .map((item) => item?.address?.city || item?.address?.town || item?.address?.village || item?.display_name?.split(',')?.[0])
-              .filter(Boolean)
-          )
-        ).slice(0, 6);
+        const normalizedQuery = query.toLowerCase();
+        const rawLabels = (data || []).map((item) => {
+          const city = item?.address?.city || item?.address?.town || item?.address?.village;
+          const road = item?.address?.road;
+          const first = item?.display_name?.split(',')?.[0];
+          return city || road || first || '';
+        }).filter(Boolean);
+
+        const startsWith = rawLabels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
+        const fallback = rawLabels.filter((label) => label.toLowerCase().includes(normalizedQuery));
+        const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
 
         setCitySuggestions(names);
+        setShowCitySuggestions(true);
       } catch {
         if (!cancelled) setCitySuggestions([]);
       }
@@ -163,7 +169,29 @@ export default function CreateMatch() {
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="form-group">
               <label className="form-label">Ciudad</label>
-              <input className="form-input" list="city-options" value={matchForm.city} onChange={(e) => setMatchForm((p) => ({ ...p, city: e.target.value }))} required />
+              <input
+                className="form-input"
+                value={matchForm.city}
+                onFocus={() => setShowCitySuggestions(true)}
+                onBlur={() => setTimeout(() => setShowCitySuggestions(false), 120)}
+                onChange={(e) => setMatchForm((p) => ({ ...p, city: e.target.value }))}
+                required
+              />
+              {showCitySuggestions && citySuggestions.length > 0 && (
+                <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
+                  {citySuggestions.map((city) => (
+                    <button
+                      key={city}
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
+                      onMouseDown={() => setMatchForm((p) => ({ ...p, city }))}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Cancha (opcional)</label>
@@ -200,7 +228,28 @@ export default function CreateMatch() {
             </div>
             <div className="form-group">
               <label className="form-label">Ciudad</label>
-              <input className="form-input" list="city-options" value={tournamentForm.city} onChange={(e) => setTournamentForm((p) => ({ ...p, city: e.target.value }))} />
+              <input
+                className="form-input"
+                value={tournamentForm.city}
+                onFocus={() => setShowCitySuggestions(true)}
+                onBlur={() => setTimeout(() => setShowCitySuggestions(false), 120)}
+                onChange={(e) => setTournamentForm((p) => ({ ...p, city: e.target.value }))}
+              />
+              {showCitySuggestions && citySuggestions.length > 0 && (
+                <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
+                  {citySuggestions.map((city) => (
+                    <button
+                      key={city}
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
+                      onMouseDown={() => setTournamentForm((p) => ({ ...p, city }))}
+                    >
+                      {city}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="form-row">
               <div className="form-group">
@@ -223,11 +272,6 @@ export default function CreateMatch() {
           {loading ? 'Publicando...' : 'Publicar solicitud'}
         </button>
 
-        <datalist id="city-options">
-          {citySuggestions.map((city) => (
-            <option key={city} value={city} />
-          ))}
-        </datalist>
       </form>
     </div>
   );
