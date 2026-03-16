@@ -241,6 +241,8 @@ export default function MatchDetail() {
                   if (res && res.alreadyRequested) {
                     setHasRequested(true);
                     alert('Ya enviaste una solicitud anteriormente');
+                  } else if (res && res.blockedByAbandon) {
+                    alert('No podés volver a unirte: abandonaste este partido dentro de las 3 horas previas');
                   } else {
                     setHasRequested(true);
                     alert('Solicitud enviada');

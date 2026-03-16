@@ -195,6 +195,9 @@ export const matchesAPI = {
       if (data && typeof data === 'object' && data.alreadyRequested) {
         return { ok: false, alreadyRequested: true };
       }
+      if (data && typeof data === 'object' && data.blockedByAbandon) {
+        return { ok: false, blockedByAbandon: true };
+      }
       return { ok: true };
     } catch (err) {
       // RPC raises a descriptive error when a duplicate request exists
@@ -206,6 +209,9 @@ export const matchesAPI = {
         msg.toLowerCase().includes('match_join_requests_unique_pending')
       ) {
         return { ok: false, alreadyRequested: true };
+      }
+      if (msg.toLowerCase().includes('blockedbyabandon') || msg.toLowerCase().includes('aband')) {
+        return { ok: false, blockedByAbandon: true };
       }
       throw err;
     }
@@ -363,6 +369,58 @@ export const profilesAPI = {
       .limit(20);
     if (error) throw error;
     return data || [];
+  },
+
+  async getMatchesAbandoned(userId) {
+    const { data, error } = await supabase
+      .from('match_abandons')
+      .select('match_id, abandoned_at, matches:match_id(id, football_type, zone, match_date, match_time, max_players)')
+      .eq('user_id', userId)
+      .order('abandoned_at', { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return data || [];
+  },
+
+  async searchProfiles(term, currentUserId) {
+    let query = supabase
+      .from('profiles')
+      .select('id, name, avatar_url')
+      .order('name', { ascending: true })
+      .limit(20);
+
+    if (term && term.trim()) {
+      query = query.ilike('name', `%${term.trim()}%`);
+    }
+    if (currentUserId) {
+      query = query.neq('id', currentUserId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async sendProfileMessage(toUserId, message) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data: myProfile } = await supabase
+      .from('profiles')
+      .select('name')
+      .eq('id', session.user.id)
+      .maybeSingle();
+
+    const senderName = myProfile?.name || 'Usuario';
+    const { error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: toUserId,
+        type: 'profile_message',
+        message: `Mensaje de ${senderName}: ${message}`,
+        data: { fromUserId: session.user.id, path: '/profile' },
+      });
+    if (error) throw error;
   },
 };
 

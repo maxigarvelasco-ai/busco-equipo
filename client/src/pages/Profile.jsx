@@ -8,8 +8,11 @@ export default function Profile() {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
   const [matchesJoined, setMatchesJoined] = useState([]);
-  const [matchesCreated, setMatchesCreated] = useState([]);
+  const [matchesAbandoned, setMatchesAbandoned] = useState([]);
   const [subscription, setSubscription] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [profileResults, setProfileResults] = useState([]);
+  const [profileMessages, setProfileMessages] = useState({});
   const [loading, setLoading] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
 
@@ -19,18 +22,41 @@ export default function Profile() {
 
   async function fetchData() {
     try {
-      const [joined, created, sub] = await Promise.all([
+      const [joined, abandoned, sub] = await Promise.all([
         profilesAPI.getMatchesJoined(user.id),
-        profilesAPI.getMatchesCreated(user.id),
+        profilesAPI.getMatchesAbandoned(user.id).catch(() => []),
         subscriptionsAPI.getMine().catch(() => null),
       ]);
       setMatchesJoined(joined);
-      setMatchesCreated(created);
+      setMatchesAbandoned(abandoned);
       setSubscription(sub);
     } catch (err) {
       console.error('Error loading profile data:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSearchProfiles() {
+    try {
+      const results = await profilesAPI.searchProfiles(searchTerm, user.id);
+      setProfileResults(results);
+    } catch (err) {
+      console.error('Error searching profiles:', err);
+      alert('No se pudieron buscar perfiles');
+    }
+  }
+
+  async function handleSendProfileMessage(targetId) {
+    const msg = (profileMessages[targetId] || '').trim();
+    if (!msg) return;
+    try {
+      await profilesAPI.sendProfileMessage(targetId, msg);
+      setProfileMessages(prev => ({ ...prev, [targetId]: '' }));
+      alert('Mensaje enviado');
+    } catch (err) {
+      console.error('Error sending profile message:', err);
+      alert('No se pudo enviar el mensaje');
     }
   }
 
@@ -74,8 +100,8 @@ export default function Profile() {
           <div className="stat-label">Jugados</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value">{matchesCreated.length}</div>
-          <div className="stat-label">Creados</div>
+          <div className="stat-value">{matchesAbandoned.length}</div>
+          <div className="stat-label">Abandonados</div>
         </div>
         <div className="stat-card">
           <div className="stat-value">{isPro ? 'Pro' : 'Free'}</div>
@@ -83,33 +109,46 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Recent matches joined */}
-      {matchesJoined.length > 0 && (
-        <div style={{ marginTop: 'var(--space-2xl)' }}>
-          <div className="section-header">
-            <span className="section-title">Últimos partidos</span>
-          </div>
-          {matchesJoined.slice(0, 5).map(mp => {
-            const m = mp.matches;
-            if (!m) return null;
-            return (
-              <div key={mp.match_id} className="card" style={{ marginBottom: 'var(--space-sm)', padding: 'var(--space-lg)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <span style={{ fontWeight: 700 }}>⚽ Fútbol {m.football_type}</span>
-                    <span style={{ color: 'var(--color-text-muted)', marginLeft: '0.5rem', fontSize: 'var(--font-size-xs)' }}>
-                      {m.zone}
-                    </span>
-                  </div>
-                  <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>
-                    {new Date(m.match_date).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })} {m.match_time?.slice(0, 5)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+      <div style={{ marginTop: 'var(--space-2xl)' }}>
+        <div className="section-header">
+          <span className="section-title">Buscar perfiles</span>
         </div>
-      )}
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <input
+            className="form-input"
+            style={{ flex: 1 }}
+            placeholder="Nombre de usuario"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button className="btn btn-secondary" onClick={handleSearchProfiles}>Buscar</button>
+        </div>
+
+        {profileResults.map((p) => (
+          <div key={p.id} className="card" style={{ marginBottom: '0.75rem', padding: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+              {p.avatar_url ? (
+                <img src={p.avatar_url} alt={p.name} style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ddd', display: 'grid', placeItems: 'center' }}>
+                  {(p.name || '?').slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <strong>{p.name || 'Sin nombre'}</strong>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input
+                className="form-input"
+                style={{ flex: 1 }}
+                placeholder="Escribir mensaje..."
+                value={profileMessages[p.id] || ''}
+                onChange={(e) => setProfileMessages(prev => ({ ...prev, [p.id]: e.target.value }))}
+              />
+              <button className="btn btn-primary" onClick={() => handleSendProfileMessage(p.id)}>Enviar</button>
+            </div>
+          </div>
+        ))}
+      </div>
 
       <div style={{ marginTop: 'var(--space-2xl)', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
         {!isPro && (

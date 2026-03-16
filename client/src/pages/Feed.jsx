@@ -48,6 +48,8 @@ export default function Feed() {
       const res = await matchesAPI.requestJoin(matchId);
       if (res?.alreadyRequested) {
         showToast('Ya tenías una solicitud pendiente', 'error');
+      } else if (res?.blockedByAbandon) {
+        showToast('No podés volver a unirte: abandonaste este partido cerca del horario', 'error');
       } else {
         showToast('¡Solicitud enviada! 🎉');
       }
