@@ -24,7 +24,13 @@ export default function MatchDetail() {
     
     // Subscribe to chat messages
     const chatSub = supabase.channel(`match_chat_${id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'match_messages', filter: `match_id=eq.${id}` }, loadMessages)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'match_messages', filter: `match_id=eq.${id}` }, (payload) => {
+        try {
+          const n = payload?.new || payload?.record || null;
+          if (!n) return;
+          setMessages(prev => [...prev, n]);
+        } catch (e) { console.error('Realtime message handler error', e); }
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(chatSub); };
@@ -94,7 +100,8 @@ export default function MatchDetail() {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
     try {
-      await matchesAPI.sendMessage(id, newMessage);
+      const inserted = await matchesAPI.sendMessage(id, newMessage);
+      if (inserted) setMessages(prev => [...prev, inserted]);
       setNewMessage('');
     } catch (err) {
       console.error(err);
@@ -221,9 +228,18 @@ export default function MatchDetail() {
               className="btn btn-primary" 
               style={{ marginTop: '1rem', width: '100%' }} 
               onClick={async () => {
-                await matchesAPI.requestJoin(match.id);
-                setHasRequested(true);
-                alert('Solicitud enviada');
+                try {
+                  const res = await matchesAPI.requestJoin(match.id);
+                  if (res && res.alreadyRequested) {
+                    setHasRequested(true);
+                    alert('Ya enviaste una solicitud anteriormente');
+                  } else {
+                    setHasRequested(true);
+                    alert('Solicitud enviada');
+                  }
+                } catch (err) {
+                  alert('Error al enviar solicitud: ' + (err?.message || 'ver consola'));
+                }
               }}
               disabled={match.has_joined || hasRequested}
             >

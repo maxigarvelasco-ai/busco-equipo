@@ -176,13 +176,21 @@ export const matchesAPI = {
   async requestJoin(matchId) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
-
-    const { error } = await supabase.rpc('request_join_match', { 
-      p_match_id: matchId, 
-      p_user_id: session.user.id 
-    });
-    
-    if (error) throw error;
+    try {
+      const { error } = await supabase.rpc('request_join_match', { 
+        p_match_id: matchId, 
+        p_user_id: session.user.id 
+      });
+      if (error) throw error;
+      return { ok: true };
+    } catch (err) {
+      // RPC raises a descriptive error when a duplicate request exists
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('join request already exists') || msg.toLowerCase().includes('join request already')) {
+        return { ok: false, alreadyRequested: true };
+      }
+      throw err;
+    }
   },
 
   // Approve join request
@@ -282,10 +290,13 @@ export const matchesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('match_messages')
-      .insert({ match_id: matchId, user_id: session.user.id, message });
+      .insert({ match_id: matchId, user_id: session.user.id, message })
+      .select()
+      .single();
     if (error) throw error;
+    return data;
   },
 
   // Feature a match
