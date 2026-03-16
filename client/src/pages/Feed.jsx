@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../services/supabaseClient';
-import { matchesAPI } from '../services/api';
+import { matchesAPI, profilesAPI } from '../services/api';
 import MatchCard from '../components/MatchCard';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,6 +15,9 @@ export default function Feed() {
   const [error, setError] = useState(null);
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [toast, setToast] = useState(null);
+  const [profileQuery, setProfileQuery] = useState('');
+  const [profileResults, setProfileResults] = useState([]);
+  const [searchingProfiles, setSearchingProfiles] = useState(false);
 
   const [initialLoad, setInitialLoad] = useState(true);
 
@@ -47,9 +50,11 @@ export default function Feed() {
     try {
       const res = await matchesAPI.requestJoin(matchId);
       if (res?.alreadyRequested) {
-        showToast('Ya tenías una solicitud pendiente', 'error');
+        showToast('Revisá las políticas de la app para este caso', 'error');
+        navigate('/support', { state: { openPolicy: 'abandon' } });
       } else if (res?.blockedByAbandon) {
-        showToast('No podés volver a unirte: abandonaste este partido cerca del horario', 'error');
+        showToast('Aplican políticas por abandono cercano al horario', 'error');
+        navigate('/support', { state: { openPolicy: 'abandon' } });
       } else {
         showToast('¡Solicitud enviada! 🎉');
       }
@@ -92,6 +97,19 @@ export default function Feed() {
     }
   };
 
+  const handleSearchProfiles = async () => {
+    try {
+      setSearchingProfiles(true);
+      const results = await profilesAPI.searchProfiles(profileQuery, user?.id);
+      setProfileResults(results);
+    } catch (err) {
+      console.error('Error searching profiles:', err);
+      showToast('No se pudieron buscar perfiles', 'error');
+    } finally {
+      setSearchingProfiles(false);
+    }
+  };
+
   return (
     <div className="page-content">
       {toast && (
@@ -112,6 +130,43 @@ export default function Feed() {
             {area}
           </button>
         ))}
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="section-header" style={{ marginBottom: '0.75rem' }}>
+          <span className="section-title">Buscar perfiles</span>
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <input
+            className="form-input"
+            style={{ flex: 1 }}
+            placeholder="Nombre de usuario"
+            value={profileQuery}
+            onChange={(e) => setProfileQuery(e.target.value)}
+          />
+          <button className="btn btn-secondary" onClick={handleSearchProfiles} disabled={searchingProfiles}>
+            {searchingProfiles ? 'Buscando...' : 'Buscar'}
+          </button>
+        </div>
+        {profileResults.length > 0 && (
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            {profileResults.map((p) => (
+              <div key={p.id} className="card" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {p.avatar_url ? (
+                    <img src={p.avatar_url} alt={p.name} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#ddd', display: 'grid', placeItems: 'center' }}>
+                      {(p.name || '?').slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <strong>{p.name || 'Sin nombre'}</strong>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => navigate(`/users/${p.id}`)}>Ver perfil</button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {isLoading ? (

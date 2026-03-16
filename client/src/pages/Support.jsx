@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { supportAPI } from '../services/api';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export default function Support() {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const { state } = useLocation();
   const navigate = useNavigate();
+  const openPolicy = state?.openPolicy;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,6 +34,14 @@ export default function Support() {
       </div>
 
       <div className="card">
+        <h3 style={{ marginTop: 0, marginBottom: '0.75rem' }}>Políticas de la app</h3>
+        <div className="card" style={{ marginBottom: '1rem', borderColor: openPolicy === 'abandon' ? 'var(--color-primary)' : 'var(--color-border)' }}>
+          <strong>Abandono de partido (3 horas antes)</strong>
+          <p style={{ marginTop: '0.5rem' }}>
+            Si un jugador abandona un partido dentro de las 3 horas previas al horario, queda bloqueado para volver a unirse a ese mismo partido.
+          </p>
+        </div>
+
         <p>¿Tuviste algún problema en un partido o necesitás ayuda con la app? Escribinos y lo solucionamos.</p>
         
         <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>

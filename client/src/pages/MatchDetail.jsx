@@ -246,9 +246,9 @@ export default function MatchDetail() {
                   const res = await matchesAPI.requestJoin(match.id);
                   if (res && res.alreadyRequested) {
                     setHasRequested(true);
-                    alert('Ya enviaste una solicitud anteriormente');
+                    navigate('/support', { state: { openPolicy: 'abandon' } });
                   } else if (res && res.blockedByAbandon) {
-                    alert('No podés volver a unirte: abandonaste este partido dentro de las 3 horas previas');
+                    navigate('/support', { state: { openPolicy: 'abandon' } });
                   } else {
                     setHasRequested(true);
                     alert('Solicitud enviada');
