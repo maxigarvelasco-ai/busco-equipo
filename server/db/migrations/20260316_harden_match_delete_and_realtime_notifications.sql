@@ -16,6 +16,8 @@
 
 -- --- 1) Delete-match RPC (single-arg, auth.uid based) ---
 DROP FUNCTION IF EXISTS public.delete_match(integer, integer);
+DROP FUNCTION IF EXISTS public.delete_match(uuid, uuid);
+DROP FUNCTION IF EXISTS public.delete_match(uuid);
 
 CREATE OR REPLACE FUNCTION public.delete_match(p_match_id uuid)
 RETURNS jsonb
@@ -95,6 +97,8 @@ GRANT EXECUTE ON FUNCTION public.delete_match(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.delete_match(uuid, uuid) TO authenticated;
 
 -- --- 2) Join request RPC with duplicate-safe result ---
+DROP FUNCTION IF EXISTS public.request_join_match(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.request_join_match(p_match_id uuid, p_user_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
