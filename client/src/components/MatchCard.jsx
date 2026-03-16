@@ -4,7 +4,7 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
   const isFull = playersJoined >= maxPlayers;
   // Determine creator robustly: coerce to string to avoid number/string mismatch
   const uid = userId != null ? String(userId) : null;
-  const matchCreatorId = match.creator_id ?? match.organizer_id ?? (match.creator && match.creator.id) ?? null;
+  const matchCreatorId = match.owner_id ?? match.creator_id ?? match.organizer_id ?? (match.creator && match.creator.id) ?? null;
   const isCreator = Boolean(uid && matchCreatorId && uid === String(matchCreatorId));
 
   const matchDate = new Date(match.match_date);

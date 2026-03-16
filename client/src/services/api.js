@@ -73,6 +73,7 @@ export const matchesAPI = {
         data.forEach(m => {
         const info = creatorMap[m.id] || {};
         m.creator_id = info.creator_id;
+        m.owner_id = info.creator_id; // normalized owner id (creator/organizer)
         m.creator_name = info.creator_name || 'Anónimo';
         m.creator_avatar = info.creator_avatar;
         m.has_joined = joinedSet.has(m.id);
