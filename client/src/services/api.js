@@ -29,14 +29,24 @@ export const matchesAPI = {
       const matchIds = data.map(m => m.id);
       const { data: matchesWithCreators } = await supabase
         .from('matches')
-        .select('id, creator_id, profiles_creator:creator_id(name, avatar_url)')
+        .select('id, creator_id')
         .in('id', matchIds);
+
+      const creatorIds = Array.from(new Set((matchesWithCreators || []).map(m => m.creator_id).filter(Boolean)));
+      let profilesMap = {};
+      if (creatorIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, avatar_url')
+          .in('id', creatorIds);
+        profilesMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+      }
 
       const creatorMap = {};
       if (matchesWithCreators) {
         matchesWithCreators.forEach(m => {
           const cid = m.creator_id;
-          const profile = (m.profiles_creator && m.profiles_creator.length && m.profiles_creator[0]) || null;
+          const profile = profilesMap[cid] || null;
           creatorMap[m.id] = {
             creator_id: cid,
             creator_name: profile?.name || 'Anónimo',
@@ -129,7 +139,7 @@ export const matchesAPI = {
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, name, avatar_url, ranking')
+          .select('id, name, avatar_url')
           .in('id', userIds);
         const map = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
         data.forEach(r => { r.profiles = map[r.user_id] || null; });
@@ -245,7 +255,7 @@ export const matchesAPI = {
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, name, avatar_url, ranking')
+          .select('id, name, avatar_url')
           .in('id', userIds);
         const map = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
         data.forEach(r => { r.profiles = map[r.user_id] || null; });

@@ -73,15 +73,15 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
           </span>
         </div>
 
-        {isFull ? (
-          <span className="badge badge-full">COMPLETO</span>
-        ) : isCreator ? (
+        {isCreator ? (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <span className="badge badge-type">TU PARTIDO</span>
             {onDelete && (
               <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); onDelete(match.id); }} title="Eliminar partido">🗑️</button>
             )}
           </div>
+        ) : isFull ? (
+          <span className="badge badge-full">COMPLETO</span>
         ) : match.has_joined ? (
           <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); onLeave?.(match.id); }}>
             Salir
