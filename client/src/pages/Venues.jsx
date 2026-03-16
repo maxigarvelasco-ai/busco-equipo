@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { venuesAPI } from '../services/api';
 
 const ZONES = ['Todas', 'Centro', 'Pichincha', 'Fisherton', 'Echesortu', 'Alberdi', 'Arroyito', 'Macrocentro'];
+const SUGGESTED_VENUES = [
+  { id: 's1', name: 'Tifosi Futbol', zone: 'Pichincha', city: 'Rosario', football: 'F5/F7', amenities: ['iluminacion', 'vestuarios', 'buffet'] },
+  { id: 's2', name: 'La Nueva Cancha', zone: 'Fisherton', city: 'Rosario', football: 'F7/F11', amenities: ['estacionamiento', 'duchas', 'bar'] },
+  { id: 's3', name: 'Complejo Sur', zone: 'Echesortu', city: 'Rosario', football: 'F5', amenities: ['techado', 'iluminacion', 'kiosco'] },
+];
 
 export default function Venues() {
   const [venues, setVenues] = useState([]);
@@ -44,12 +49,34 @@ export default function Venues() {
       </div>
 
       {loading ? (
-        <div className="loading-spinner"><div className="spinner"></div></div>
+        <div style={{ display: 'grid', gap: '0.8rem' }}>
+          <div className="skeleton-card"></div>
+          <div className="skeleton-card"></div>
+        </div>
       ) : venues.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">🏟️</div>
-          <div className="empty-state-title">No hay canchas disponibles</div>
-          <p style={{ color: 'var(--color-text-muted)' }}>Pronto se agregarán canchas en esta zona</p>
+        <div>
+          <div className="empty-state" style={{ paddingBottom: '1rem' }}>
+            <div className="empty-state-icon">🏟️</div>
+            <div className="empty-state-title">No hay canchas cargadas en esta zona</div>
+            <p style={{ color: 'var(--color-text-muted)' }}>Mientras tanto, te sugerimos estas opciones populares</p>
+          </div>
+          <div style={{ display: 'grid', gap: '0.7rem' }}>
+            {SUGGESTED_VENUES.map((v) => (
+              <div key={v.id} className="card venue-card">
+                <div className="venue-name">🏟️ {v.name}</div>
+                <div className="match-info">
+                  <div className="match-info-row"><span className="info-icon">📍</span><span>{v.zone} - {v.city}</span></div>
+                  <div className="match-info-row"><span className="info-icon">⚽</span><span>{v.football}</span></div>
+                  <div className="match-info-row"><span className="info-icon">🧰</span><span>{v.amenities.join(' · ')}</span></div>
+                </div>
+                <div style={{ marginTop: '0.8rem', display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                  <button className="btn btn-secondary btn-sm">Ver horarios</button>
+                  <button className="btn btn-primary btn-sm">Reservar</button>
+                  <button className="btn btn-secondary btn-sm">Ver torneos</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         venues.map(venue => (

@@ -26,12 +26,6 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
     matchDate.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
 
   const timeStr = match.match_time ? match.match_time.slice(0, 5) : '';
-  const matchKindLabel = match.match_kind === 'competitivo'
-    ? '🟡 Competitivo'
-    : match.match_kind === 'torneo'
-      ? '🔴 Torneo'
-      : '🟢 Recreativo';
-
   const playerDots = [];
   const dotsToShow = Math.min(maxPlayers, 10);
   for (let i = 0; i < dotsToShow; i++) {
@@ -57,7 +51,6 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
       </div>
 
       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
-        <span className="badge badge-type">{matchKindLabel}</span>
         {match.visibility === 'private' && <span className="badge badge-type">Privado</span>}
         {match.visibility === 'contacts_only' && <span className="badge badge-type">Solo contactos</span>}
         {Number(match.price_per_player || 0) > 0 && <span className="badge badge-featured">${Number(match.price_per_player).toLocaleString('es-AR')}</span>}
@@ -66,10 +59,10 @@ export default function MatchCard({ match, onJoin, onLeave, onCancel, has_reques
       <div className="match-info">
         <div className="match-info-row">
           <span className="info-icon">📍</span>
-          <span><strong>{match.address ? `${match.address}` : match.zone}</strong></span>
+          <span><strong>{[match.zone, match.city].filter(Boolean).join(' - ') || match.address || 'Sin ubicación'}</strong></span>
         </div>
         <div className="match-info-row">
-          <span className="info-icon">📅</span>
+          <span className="info-icon">🕒</span>
           <span>{dateLabel} {timeStr}</span>
         </div>
         <div className="match-info-row">
