@@ -136,7 +136,8 @@ export default function MatchDetail() {
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;
   if (!match) return <div className="page-content">Partido no encontrado</div>;
 
-  const isCreator = String(match.owner_id ?? match.creator_id ?? match.organizer_id ?? '') === String(user?.id ?? '');
+  const ownerId = match.owner_id ?? match.creator_id ?? match.organizer_id ?? null;
+  const isCreator = Boolean(user && ownerId && String(user.id) === String(ownerId));
 
   return (
     <div className="page-content" style={{ paddingBottom: '80px' }}>
