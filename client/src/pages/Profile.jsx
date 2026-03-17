@@ -94,6 +94,17 @@ export default function Profile() {
     try {
       const isOrgMode = profileViewMode !== 'normal';
       let computedAge = null;
+      if (isOrgMode) {
+        if (!String(editForm.name || '').trim()) {
+          throw new Error('Completá el nombre del club/cancha');
+        }
+        if (!String(editForm.city || '').trim() && !String(editForm.zone || '').trim()) {
+          throw new Error('Completá la dirección (ciudad o zona) del club/cancha');
+        }
+        if (!String(editForm.phone || '').trim()) {
+          throw new Error('Completá el teléfono del club/cancha');
+        }
+      }
       if (!isOrgMode) {
         const birth = new Date(editForm.birth_date);
         if (Number.isNaN(birth.getTime())) {
@@ -302,7 +313,7 @@ export default function Profile() {
         <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: '0.75rem' }}>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Nombre</label>
+              <label className="form-label">{isOrgMode ? 'Nombre del club/cancha' : 'Nombre'}</label>
               <input className="form-input" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} required />
             </div>
           </div>
@@ -323,12 +334,12 @@ export default function Profile() {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Ciudad</label>
-              <input className="form-input" value={editForm.city} onChange={(e) => setEditForm((p) => ({ ...p, city: e.target.value }))} />
+              <label className="form-label">{isOrgMode ? 'Ciudad (dirección)' : 'Ciudad'}</label>
+              <input className="form-input" value={editForm.city} onChange={(e) => setEditForm((p) => ({ ...p, city: e.target.value }))} required={isOrgMode && !String(editForm.zone || '').trim()} />
             </div>
             <div className="form-group">
-              <label className="form-label">Zona</label>
-              <input className="form-input" value={editForm.zone} onChange={(e) => setEditForm((p) => ({ ...p, zone: e.target.value }))} />
+              <label className="form-label">{isOrgMode ? 'Zona/Barrio (dirección)' : 'Zona'}</label>
+              <input className="form-input" value={editForm.zone} onChange={(e) => setEditForm((p) => ({ ...p, zone: e.target.value }))} required={isOrgMode && !String(editForm.city || '').trim()} />
             </div>
           </div>
 
@@ -354,8 +365,8 @@ export default function Profile() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Teléfono</label>
-            <input className="form-input" value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} />
+            <label className="form-label">{isOrgMode ? 'Teléfono de contacto' : 'Teléfono'}</label>
+            <input className="form-input" value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} required={isOrgMode} />
           </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

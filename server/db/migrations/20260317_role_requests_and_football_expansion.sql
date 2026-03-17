@@ -76,10 +76,12 @@ begin
       and r.status = 'approved'
   ) into v_has_approved;
 
-  select lower(coalesce(u.email, '')) = 'maximiliano.g.velasco@gmail.com'
-    into v_is_reviewer
-  from auth.users u
-  where u.id = new.owner_id;
+  -- Avoid direct reads from auth.users to prevent permission errors under RLS.
+  -- Use JWT claims from the current session instead.
+  v_is_reviewer := (
+    auth.uid() = new.owner_id
+    and lower(coalesce(auth.jwt() ->> 'email', '')) = 'maximiliano.g.velasco@gmail.com'
+  );
 
   if not coalesce(v_has_approved, false) and not coalesce(v_is_reviewer, false) then
     raise exception 'account is not enabled for venue/club publishing';

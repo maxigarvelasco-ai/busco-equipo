@@ -578,12 +578,23 @@ export const venuesAPI = {
       throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
+    const orgReq = await getMyOrgProfileRequirements(session.user.id);
+    if (!orgReq.isComplete) {
+      throw new Error('Completá tu ficha (nombre, dirección y teléfono) para publicar como club/cancha.');
+    }
+
+    const venuePhone = String(venueData.phone || orgReq.phone || '').trim();
+    if (!venuePhone) {
+      throw new Error('Completá un teléfono de contacto para la cancha.');
+    }
+
     const fullPayload = {
       owner_id: session.user.id,
       name: venueData.name,
       address: venueData.address || null,
       city: venueData.city || null,
       zone: venueData.zone || venueData.address || venueData.city || null,
+      phone: venuePhone,
       football_types: venueData.football_types || [],
       services: venueData.services || [],
       amenities: venueData.services || [],
@@ -877,6 +888,36 @@ async function hasPrivilegedAccess(sessionUser) {
   return !!data?.id;
 }
 
+async function getMyOrgProfileRequirements(userId) {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('name, city, zone, phone')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+
+  const profileName = String(profile?.name || '').trim();
+  const phone = String(profile?.phone || '').trim();
+  const city = String(profile?.city || '').trim();
+  const zone = String(profile?.zone || '').trim();
+
+  const hasName = profileName.length > 0;
+  const hasPhone = phone.length > 0;
+  const hasAddress = city.length > 0 || zone.length > 0;
+
+  return {
+    profile,
+    profileName,
+    phone,
+    city,
+    zone,
+    hasName,
+    hasPhone,
+    hasAddress,
+    isComplete: hasName && hasPhone && hasAddress,
+  };
+}
+
 export const roleRequestsAPI = {
   async getMine() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -992,6 +1033,8 @@ export const clubsAPI = {
     const fullPayload = {
       creator_id: session.user.id,
       name: clubData.name || 'Mi club',
+      address: clubData.address || null,
+      phone: clubData.phone || null,
       city: clubData.city || null,
       zone: clubData.zone || null,
       description: clubData.description || null,
@@ -1050,7 +1093,7 @@ export const clubsAPI = {
 
     let query = supabase
       .from('club_recruitments')
-      .select('*, clubs:club_id(id, name, city, zone, creator_id)')
+      .select('*, clubs:club_id(id, name, address, phone, city, zone, creator_id)')
       .eq('status', 'open')
       .order('created_at', { ascending: false });
 
@@ -1063,7 +1106,33 @@ export const clubsAPI = {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+
+    const rows = data || [];
+    if (rows.length === 0) return rows;
+
+    const creatorIds = Array.from(new Set(rows.map((r) => r?.clubs?.creator_id).filter(Boolean)));
+    let profileMap = {};
+    if (creatorIds.length > 0) {
+      const { data: profiles, error: pErr } = await supabase
+        .from('profiles')
+        .select('id, name, city, zone, phone')
+        .in('id', creatorIds);
+      if (pErr) throw pErr;
+      profileMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
+    }
+
+    return rows.map((r) => {
+      const ownerProfile = profileMap[r?.clubs?.creator_id] || null;
+      return {
+        ...r,
+        clubs: {
+          ...(r.clubs || {}),
+          phone: r?.clubs?.phone || ownerProfile?.phone || null,
+          address: r?.clubs?.address || [ownerProfile?.city, ownerProfile?.zone].filter(Boolean).join(' - ') || null,
+          contact_name: ownerProfile?.name || null,
+        },
+      };
+    });
   },
 
   async createRecruitment(recruitmentData) {
@@ -1080,10 +1149,17 @@ export const clubsAPI = {
       throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
+    const orgReq = await getMyOrgProfileRequirements(session.user.id);
+    if (!orgReq.isComplete) {
+      throw new Error('Completá tu ficha (nombre, dirección y teléfono) para publicar como club/cancha.');
+    }
+
     const myClub = await this.ensureMine({
-      name: recruitmentData.club_name,
-      city: recruitmentData.city,
-      zone: recruitmentData.zone,
+      name: recruitmentData.club_name || orgReq.profileName,
+      address: recruitmentData.club_address || [orgReq.city, orgReq.zone].filter(Boolean).join(' - ') || null,
+      phone: recruitmentData.club_phone || orgReq.phone || null,
+      city: recruitmentData.city || orgReq.city || null,
+      zone: recruitmentData.zone || orgReq.zone || null,
       description: recruitmentData.club_description,
     });
 

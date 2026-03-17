@@ -335,6 +335,9 @@ export default function Feed() {
       needed_players: c.needed_players ?? 1,
       position_needed: c.position_needed || null,
       category: c.category || null,
+      club_address: c.clubs?.address || null,
+      club_phone: c.clubs?.phone || null,
+      club_contact_name: c.clubs?.contact_name || null,
     }));
 
     let merged = [...matchRows, ...tournamentRows, ...clubRows];
@@ -499,6 +502,24 @@ export default function Feed() {
                     <span className="info-icon">🎯</span>
                     <span>{req.position_needed ? `Buscan ${req.position_needed}` : 'Busqueda abierta de jugadores'}</span>
                   </div>
+                  {req.club_contact_name && (
+                    <div className="match-info-row">
+                      <span className="info-icon">🙋</span>
+                      <span>Contacto: {req.club_contact_name}</span>
+                    </div>
+                  )}
+                  {req.club_address && (
+                    <div className="match-info-row">
+                      <span className="info-icon">🏠</span>
+                      <span>{req.club_address}</span>
+                    </div>
+                  )}
+                  {req.club_phone && (
+                    <div className="match-info-row">
+                      <span className="info-icon">📞</span>
+                      <span>{req.club_phone}</span>
+                    </div>
+                  )}
                   <div className="match-info-row">
                     <span className="info-icon">👥</span>
                     <span>Necesitan {req.needed_players} jugador{req.needed_players === 1 ? '' : 'es'}{req.category ? ` · ${req.category}` : ''}</span>

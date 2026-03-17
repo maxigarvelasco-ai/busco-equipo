@@ -63,6 +63,7 @@ export default function Venues() {
   const [form, setForm] = useState({
     name: '',
     address: '',
+    phone: '',
     inferred_city: '',
     football_types: [],
     services: [],
@@ -221,7 +222,7 @@ export default function Venues() {
         throw new Error('Seleccioná una dirección que incluya ciudad');
       }
       const created = await venuesAPI.create({ ...form, city: inferredCity, address: normalizedAddress || form.address.trim() });
-      setForm({ name: '', address: '', inferred_city: '', football_types: [], services: [] });
+      setForm({ name: '', address: '', phone: '', inferred_city: '', football_types: [], services: [] });
       setShowCreate(false);
       setCreateSuccess('Cancha guardada correctamente');
       if (created) {
@@ -326,6 +327,16 @@ export default function Venues() {
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Telefono de contacto</label>
+            <input
+              className="form-input"
+              value={form.phone}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              required
+            />
           </div>
 
           <div className="form-group">

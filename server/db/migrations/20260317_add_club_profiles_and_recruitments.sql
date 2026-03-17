@@ -11,11 +11,17 @@ create table if not exists public.clubs (
   id uuid primary key default gen_random_uuid(),
   creator_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
+  address text,
+  phone text,
   city text,
   zone text,
   description text,
   created_at timestamptz not null default now()
 );
+
+alter table if exists public.clubs
+  add column if not exists address text,
+  add column if not exists phone text;
 
 create index if not exists clubs_creator_id_idx on public.clubs(creator_id);
 create index if not exists clubs_created_at_idx on public.clubs(created_at desc);
