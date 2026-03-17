@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { matchesAPI, tournamentsAPI } from '../services/api';
+import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 
 export default function CreateMatch() {
   const navigate = useNavigate();
@@ -8,7 +8,7 @@ export default function CreateMatch() {
   const [error, setError] = useState('');
 
   const [requestType, setRequestType] = useState('casual_match');
-  const [footballType, setFootballType] = useState('5');
+  const [footballMode, setFootballMode] = useState('f5');
   const [matchForm, setMatchForm] = useState({
     venue: '',
     inferred_city: '',
@@ -36,6 +36,15 @@ export default function CreateMatch() {
     max_age: '25',
     description: '',
   });
+  const [clubForm, setClubForm] = useState({
+    club_name: '',
+    category: '',
+    position_needed: '',
+    city: '',
+    zone: '',
+    needed_players: '1',
+    description: '',
+  });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [mapsReady, setMapsReady] = useState(false);
@@ -43,6 +52,15 @@ export default function CreateMatch() {
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [detectedCoords, setDetectedCoords] = useState(null);
   const currentAddressQuery = requestType === 'casual_match' ? matchForm.venue : tournamentForm.venue;
+  const FOOTBALL_OPTIONS = [
+    { key: 'futsal', label: 'Futsal', value: 5 },
+    { key: 'f5', label: 'F5', value: 5 },
+    { key: 'f7', label: 'F7', value: 7 },
+    { key: 'f8', label: 'F8', value: 8 },
+    { key: 'f11', label: 'F11', value: 11 },
+  ];
+  const selectedFootball = FOOTBALL_OPTIONS.find((o) => o.key === footballMode) || FOOTBALL_OPTIONS[1];
+  const footballType = selectedFootball.value;
 
   const getPlacesAutocompleteService = () => {
     if (!window.google?.maps?.places?.AutocompleteService) return null;
@@ -229,7 +247,7 @@ export default function CreateMatch() {
         const normalizedAddress = normalizeAddressLabel(matchForm.venue.trim());
         await matchesAPI.create({
           football_type: parseInt(footballType),
-          title: `Partido F${footballType}`,
+          title: footballMode === 'futsal' ? 'Partido Futsal' : `Partido F${footballType}`,
           city: inferredCity,
           address: normalizedAddress,
           latitude: null,
@@ -243,14 +261,14 @@ export default function CreateMatch() {
           min_age: matchForm.age_restricted ? parseInt(matchForm.min_age || '0') : null,
           max_age: matchForm.age_restricted ? parseInt(matchForm.max_age || '0') : null,
           goalkeepers_needed: parseInt(matchForm.goalkeepers_needed || '0'),
-          match_kind: 'recreativo',
+          match_kind: footballMode === 'futsal' ? 'futsal' : 'recreativo',
           visibility: 'public',
           requires_approval: true,
           allow_waitlist: true,
           price_per_player: 0,
           description: matchForm.description || null,
         });
-      } else {
+      } else if (requestType === 'tournament_request') {
         if (!tournamentForm.name.trim()) {
           throw new Error('Completá el nombre del torneo');
         }
@@ -277,6 +295,25 @@ export default function CreateMatch() {
           max_age: tournamentForm.age_restricted ? parseInt(tournamentForm.max_age || '0') : null,
           needed_players: parseInt(tournamentForm.needed_players || '1'),
           description: tournamentForm.description || null,
+        });
+      } else {
+        if (!clubForm.club_name.trim()) {
+          throw new Error('Completá el nombre del club/equipo');
+        }
+        if (!clubForm.position_needed.trim()) {
+          throw new Error('Completá la posicion a buscar');
+        }
+
+        await clubsAPI.createRecruitmentForMe({
+          club_name: clubForm.club_name.trim(),
+          football_type: parseInt(footballType),
+          category: clubForm.category.trim() || null,
+          position_needed: clubForm.position_needed.trim(),
+          city: clubForm.city.trim() || null,
+          zone: clubForm.zone.trim() || null,
+          needed_players: parseInt(clubForm.needed_players || '1'),
+          description: clubForm.description.trim() || null,
+          club_description: clubForm.description.trim() || null,
         });
       }
       navigate('/');
@@ -307,21 +344,25 @@ export default function CreateMatch() {
               <input type="radio" name="request_type" checked={requestType === 'tournament_request'} onChange={() => setRequestType('tournament_request')} />
               Completar equipo para torneo
             </label>
+            <label className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.7rem' }}>
+              <input type="radio" name="request_type" checked={requestType === 'club_recruitment'} onChange={() => setRequestType('club_recruitment')} />
+              Para mi club o categoría
+            </label>
           </div>
         </div>
 
         <div className="form-group">
           <label className="form-label">Paso 2: Tipo de futbol</label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['5', '7', '11'].map((type) => (
+            {FOOTBALL_OPTIONS.map((option) => (
               <button
-                key={type}
+                key={option.key}
                 type="button"
-                className={`btn ${footballType === type ? 'btn-primary' : 'btn-secondary'}`}
+                className={`btn ${footballMode === option.key ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ flex: 1 }}
-                onClick={() => setFootballType(type)}
+                onClick={() => setFootballMode(option.key)}
               >
-                F{type}
+                {option.label}
               </button>
             ))}
           </div>
@@ -425,7 +466,7 @@ export default function CreateMatch() {
               <textarea className="form-textarea" value={matchForm.description} onChange={(e) => setMatchForm((p) => ({ ...p, description: e.target.value }))} />
             </div>
           </div>
-        ) : (
+        ) : requestType === 'tournament_request' ? (
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="form-group">
               <label className="form-label">Nombre del torneo</label>
@@ -510,6 +551,84 @@ export default function CreateMatch() {
             <div className="form-group">
               <label className="form-label">Descripcion</label>
               <textarea className="form-textarea" value={tournamentForm.description} onChange={(e) => setTournamentForm((p) => ({ ...p, description: e.target.value }))} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: '0.6rem' }}>
+            <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
+              Para publicar esta búsqueda necesitás tener aprobado el modo club desde tu perfil.
+            </div>
+            <div className="form-group">
+              <label className="form-label">Nombre del club/equipo</label>
+              <input
+                className="form-input"
+                value={clubForm.club_name}
+                onChange={(e) => setClubForm((p) => ({ ...p, club_name: e.target.value }))}
+                placeholder="Ej: Reserva Casildense"
+                required
+              />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Categoria</label>
+                <input
+                  className="form-input"
+                  value={clubForm.category}
+                  onChange={(e) => setClubForm((p) => ({ ...p, category: e.target.value }))}
+                  placeholder="Ej: Sub-17 Femenina"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Posicion buscada</label>
+                <input
+                  className="form-input"
+                  value={clubForm.position_needed}
+                  onChange={(e) => setClubForm((p) => ({ ...p, position_needed: e.target.value }))}
+                  placeholder="Ej: Arquera"
+                  required
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Ciudad</label>
+                <input
+                  className="form-input"
+                  value={clubForm.city}
+                  onChange={(e) => setClubForm((p) => ({ ...p, city: e.target.value }))}
+                  placeholder="Ej: Casilda"
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Zona</label>
+                <input
+                  className="form-input"
+                  value={clubForm.zone}
+                  onChange={(e) => setClubForm((p) => ({ ...p, zone: e.target.value }))}
+                  placeholder="Ej: Centro"
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Cantidad de jugadores</label>
+              <input
+                type="number"
+                className="form-input"
+                min="1"
+                max="30"
+                value={clubForm.needed_players}
+                onChange={(e) => setClubForm((p) => ({ ...p, needed_players: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Descripcion</label>
+              <textarea
+                className="form-textarea"
+                value={clubForm.description}
+                onChange={(e) => setClubForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="Ej: Buscamos arquera titular para torneo local"
+              />
             </div>
           </div>
         )}

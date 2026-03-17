@@ -86,6 +86,7 @@ export default function UserProfile() {
   if (!profile) return <div className="page-content">Perfil no encontrado</div>;
 
   const initial = profile.name ? profile.name[0].toUpperCase() : '?';
+  const isClubProfile = profile?.profile_type === 'club';
 
   return (
     <div className="page-content" style={{ paddingBottom: '80px' }}>
@@ -114,11 +115,11 @@ export default function UserProfile() {
         )}
 
         <div className="match-info" style={{ marginTop: '0.8rem' }}>
-          <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>
-          <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>
+          {!isClubProfile && <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>}
+          {!isClubProfile && <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>}
           <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[profile.city, profile.zone].filter(Boolean).join(' - ') || '-'}</span></div>
-          <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>
-          <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>
+          {!isClubProfile && <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>}
+          {!isClubProfile && <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>}
           <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {profile.bio || '-'}</span></div>
         </div>
       </div>

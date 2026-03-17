@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { profilesAPI, subscriptionsAPI } from '../services/api';
+import { profilesAPI, roleRequestsAPI, subscriptionsAPI } from '../services/api';
 import ReportModal from '../components/ReportModal';
 
 export default function Profile() {
@@ -18,6 +18,9 @@ export default function Profile() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
+  const [roleRequests, setRoleRequests] = useState([]);
+  const [sendingRoleRequest, setSendingRoleRequest] = useState('');
+  const [roleRequestMsg, setRoleRequestMsg] = useState('');
   const [editForm, setEditForm] = useState({
     name: '',
     birth_date: '',
@@ -67,9 +70,11 @@ export default function Profile() {
         profilesAPI.getMatchesAbandoned(user.id).catch(() => []),
         subscriptionsAPI.getMine().catch(() => null),
       ]);
+      const requests = await roleRequestsAPI.getMine().catch(() => []);
       setMatchesJoined(joined);
       setMatchesAbandoned(abandoned);
       setSubscription(sub);
+      setRoleRequests(requests || []);
     } catch (err) {
       console.error('Error loading profile data:', err);
     } finally {
@@ -82,20 +87,24 @@ export default function Profile() {
     setSaveMsg('');
     setSaving(true);
     try {
-      const birth = new Date(editForm.birth_date);
-      if (Number.isNaN(birth.getTime())) {
-        throw new Error('Ingresá una fecha de nacimiento válida');
-      }
-      const computedAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-      if (computedAge < 13 || computedAge > 90) {
-        throw new Error('La fecha de nacimiento debe dar una edad entre 13 y 90 años');
+      const isClubProfile = profile?.profile_type === 'club';
+      let computedAge = null;
+      if (!isClubProfile) {
+        const birth = new Date(editForm.birth_date);
+        if (Number.isNaN(birth.getTime())) {
+          throw new Error('Ingresá una fecha de nacimiento válida');
+        }
+        computedAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+        if (computedAge < 13 || computedAge > 90) {
+          throw new Error('La fecha de nacimiento debe dar una edad entre 13 y 90 años');
+        }
       }
 
       const updates = {
         name: editForm.name,
-        birth_date: editForm.birth_date || null,
+        birth_date: isClubProfile ? null : (editForm.birth_date || null),
         age: computedAge,
-        gender: editForm.gender || null,
+        gender: isClubProfile ? null : (editForm.gender || null),
         city: editForm.city || null,
         zone: editForm.zone || null,
         preferred_position: editForm.preferred_position || null,
@@ -122,6 +131,7 @@ export default function Profile() {
   const initial = profile.name ? profile.name[0].toUpperCase() : '?';
   const joined = new Date(profile.created_at).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' });
   const isPro = subscription && new Date(subscription.expires_at) > new Date();
+  const isClubProfile = profile?.profile_type === 'club';
 
   async function handleSearchProfiles(e) {
     e.preventDefault();
@@ -139,6 +149,33 @@ export default function Profile() {
       setSearchResults([]);
     } finally {
       setSearching(false);
+    }
+  }
+
+  const getRoleStatus = (role) => {
+    const req = (roleRequests || []).find((r) => r.desired_role === role);
+    return req?.status || null;
+  };
+
+  async function handleRoleRequest(role) {
+    setRoleRequestMsg('');
+    setSendingRoleRequest(role);
+    try {
+      const roleLabel = role === 'venue_member' ? 'dueño de cancha' : 'club';
+      const res = await roleRequestsAPI.submit(role, `Solicitud de habilitacion de modo ${roleLabel}`);
+      if (res?.alreadyApproved) {
+        setRoleRequestMsg(`Ya tenés aprobado el modo ${roleLabel}.`);
+      } else if (res?.alreadyPending) {
+        setRoleRequestMsg(`Ya hay una solicitud pendiente para modo ${roleLabel}.`);
+      } else {
+        setRoleRequestMsg(`Solicitud enviada a Maximiliano.g.velasco@gmail.com para modo ${roleLabel}.`);
+      }
+      const requests = await roleRequestsAPI.getMine().catch(() => []);
+      setRoleRequests(requests || []);
+    } catch (err) {
+      setRoleRequestMsg(err.message || 'No se pudo enviar la solicitud');
+    } finally {
+      setSendingRoleRequest('');
     }
   }
 
@@ -187,7 +224,7 @@ export default function Profile() {
 
       <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-          <h3>Mi ficha de jugador</h3>
+          <h3>{isClubProfile ? 'Mi ficha de club' : 'Mi ficha de jugador'}</h3>
           {!isEditingFicha ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingFicha(true)}>
               Editar ficha
@@ -202,11 +239,11 @@ export default function Profile() {
         {!isEditingFicha ? (
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="match-info-row"><span className="info-icon">🧍</span><span><strong>Nombre:</strong> {profile.name || '-'}</span></div>
-            <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>
-            <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>
+            {!isClubProfile && <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>}
+            {!isClubProfile && <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>}
             <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[profile.city, profile.zone].filter(Boolean).join(' - ') || '-'}</span></div>
-            <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>
-            <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>
+            {!isClubProfile && <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>}
+            {!isClubProfile && <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>}
             <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {profile.bio || '-'}</span></div>
             <div className="match-info-row"><span className="info-icon">📞</span><span><strong>Teléfono:</strong> {profile.phone || '-'}</span></div>
           </div>
@@ -219,7 +256,7 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="form-row">
+          {!isClubProfile && <div className="form-row">
             <div className="form-group">
               <label className="form-label">Fecha de nacimiento</label>
               <input type="date" className="form-input" value={editForm.birth_date} onChange={(e) => setEditForm((p) => ({ ...p, birth_date: e.target.value }))} required />
@@ -231,7 +268,7 @@ export default function Profile() {
                 <option value="femenino">Femenino</option>
               </select>
             </div>
-          </div>
+          </div>}
 
           <div className="form-row">
             <div className="form-group">
@@ -244,7 +281,7 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="form-row">
+          {!isClubProfile && <div className="form-row">
             <div className="form-group">
               <label className="form-label">Posición</label>
               <input className="form-input" value={editForm.preferred_position} onChange={(e) => setEditForm((p) => ({ ...p, preferred_position: e.target.value }))} placeholder="Ej: Volante" />
@@ -258,7 +295,7 @@ export default function Profile() {
                 <option value="both">Ambas</option>
               </select>
             </div>
-          </div>
+          </div>}
 
           <div className="form-group">
             <label className="form-label">Bio</label>
@@ -282,6 +319,38 @@ export default function Profile() {
           </button>
         </form>
         )}
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
+        <h3 style={{ marginBottom: '0.8rem' }}>Accesos especiales</h3>
+        <p style={{ color: 'var(--color-text-muted)', marginBottom: '0.8rem' }}>
+          Tu cuenta sigue siendo normal y podés pedir habilitación para usar también modos especiales.
+        </p>
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          <div className="match-info-row" style={{ justifyContent: 'space-between' }}>
+            <span><strong>Modo dueño de cancha:</strong> {getRoleStatus('venue_member') || 'sin solicitud'}</span>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={sendingRoleRequest === 'venue_member' || getRoleStatus('venue_member') === 'approved'}
+              onClick={() => handleRoleRequest('venue_member')}
+            >
+              {sendingRoleRequest === 'venue_member' ? 'Enviando...' : 'Solicitar'}
+            </button>
+          </div>
+          <div className="match-info-row" style={{ justifyContent: 'space-between' }}>
+            <span><strong>Modo club:</strong> {getRoleStatus('club') || 'sin solicitud'}</span>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={sendingRoleRequest === 'club' || getRoleStatus('club') === 'approved'}
+              onClick={() => handleRoleRequest('club')}
+            >
+              {sendingRoleRequest === 'club' ? 'Enviando...' : 'Solicitar'}
+            </button>
+          </div>
+        </div>
+        {roleRequestMsg && <p style={{ marginTop: '0.8rem', color: 'var(--color-text-muted)' }}>{roleRequestMsg}</p>}
       </div>
 
       <div id="buscar-perfiles" className="card" style={{ marginTop: 'var(--space-xl)' }}>

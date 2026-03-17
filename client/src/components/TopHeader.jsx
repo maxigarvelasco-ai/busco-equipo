@@ -7,6 +7,9 @@ export default function TopHeader() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifItems, setNotifItems] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searching, setSearching] = useState(false);
@@ -14,7 +17,7 @@ export default function TopHeader() {
   const [addedContacts, setAddedContacts] = useState({});
   const [addingContactId, setAddingContactId] = useState(null);
   const [searchStatus, setSearchStatus] = useState('');
-  const searchPanelRef = useRef(null);
+  const topActionsRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,15 +42,16 @@ export default function TopHeader() {
   }, [user]);
 
   useEffect(() => {
-    if (!searchOpen) return;
+    if (!searchOpen && !notifOpen) return;
     function handleOutsideClick(e) {
-      if (searchPanelRef.current && !searchPanelRef.current.contains(e.target)) {
+      if (topActionsRef.current && !topActionsRef.current.contains(e.target)) {
         setSearchOpen(false);
+        setNotifOpen(false);
       }
     }
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [searchOpen]);
+  }, [searchOpen, notifOpen]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -106,8 +110,60 @@ export default function TopHeader() {
 
   function goToUserProfile(profileId) {
     setSearchOpen(false);
+    setNotifOpen(false);
     setSearchTerm('');
     navigate(`/users/${profileId}`);
+  }
+
+  function resolveNotifPath(notif) {
+    const data = notif?.data;
+    if (!data || typeof data !== 'object') return null;
+    if (typeof data.path === 'string' && data.path.startsWith('/')) return data.path;
+    if (data.matchId || data.match_id || data.id) return `/match/${data.matchId || data.match_id || data.id}`;
+    return null;
+  }
+
+  async function openNotificationsPanel() {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+
+    const nextOpen = !notifOpen;
+    setNotifOpen(nextOpen);
+    setSearchOpen(false);
+    if (!nextOpen) return;
+
+    setNotifLoading(true);
+    try {
+      const list = await notificationsAPI.getMine();
+      setNotifItems(list || []);
+      setUnreadCount((list || []).filter((n) => !n.is_read).length);
+    } catch {
+      setNotifItems([]);
+    } finally {
+      setNotifLoading(false);
+    }
+  }
+
+  async function handleNotifClick(notif) {
+    try {
+      if (!notif?.is_read) {
+        await notificationsAPI.markAsRead(notif.id);
+        setNotifItems((prev) => prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)));
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch {
+      // keep navigation behavior even if mark-as-read fails
+    }
+
+    const path = resolveNotifPath(notif);
+    setNotifOpen(false);
+    if (path) {
+      navigate(path);
+    } else {
+      navigate('/notifications');
+    }
   }
 
   return (
@@ -115,7 +171,7 @@ export default function TopHeader() {
       <div className="top-header-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer', margin: 0 }}>
         ⚽ Busco<span>Equipo</span>
       </div>
-      <div className="top-header-actions" ref={searchPanelRef}>
+      <div className="top-header-actions" ref={topActionsRef}>
         {user && (
           <button
             type="button"
@@ -146,7 +202,7 @@ export default function TopHeader() {
           type="button"
           className="btn btn-secondary btn-sm"
           style={{ minWidth: 44, height: 36, position: 'relative', padding: '0 0.7rem' }}
-          onClick={() => navigate(user ? '/notifications' : '/login')}
+          onClick={openNotificationsPanel}
           aria-label="Notificaciones"
         >
           🔔
@@ -234,6 +290,36 @@ export default function TopHeader() {
                 })
               ) : (
                 <div className="header-search-empty">{searchStatus || 'Empeza a escribir para buscar perfiles.'}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {notifOpen && user && (
+          <div className="header-notif-panel">
+            <div className="header-notif-head">
+              <strong>Notificaciones</strong>
+              <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/notifications')}>
+                Ver todas
+              </button>
+            </div>
+            <div className="header-notif-list">
+              {notifLoading ? (
+                <div className="header-search-empty">Cargando...</div>
+              ) : notifItems.length === 0 ? (
+                <div className="header-search-empty">No hay notificaciones</div>
+              ) : (
+                notifItems.slice(0, 8).map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className={`header-notif-item ${n.is_read ? 'is-read' : ''}`}
+                    onClick={() => handleNotifClick(n)}
+                  >
+                    <div className="header-search-name">{n.message || n.content || 'Notificación'}</div>
+                    <div className="header-search-meta">{new Date(n.created_at).toLocaleString('es-AR')}</div>
+                  </button>
+                ))
               )}
             </div>
           </div>

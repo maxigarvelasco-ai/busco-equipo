@@ -453,7 +453,7 @@ export const profilesAPI = {
     const trimmed = term?.trim() || '';
     let query = supabase
       .from('profiles')
-      .select('id, name, avatar_url, city, zone, preferred_position, skill_level')
+      .select('id, name, avatar_url, city, zone, preferred_position, skill_level, profile_type')
       .eq('is_profile_public', true)
       .order('name', { ascending: true })
       .limit(20);
@@ -573,14 +573,17 @@ export const venuesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data: myProfile } = await supabase
-      .from('profiles')
-      .select('profile_type')
-      .eq('id', session.user.id)
+    const { data: venueApproval } = await supabase
+      .from('role_upgrade_requests')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('desired_role', 'venue_member')
+      .eq('status', 'approved')
+      .limit(1)
       .maybeSingle();
 
-    if (myProfile?.profile_type !== 'venue_member') {
-      throw new Error('Solo perfiles miembro de canchas pueden agregar canchas');
+    if (!venueApproval?.id) {
+      throw new Error('Necesitas aprobacion para usar modo dueño de cancha. Solicitalo desde tu perfil.');
     }
 
     const fullPayload = {
@@ -852,6 +855,62 @@ export const notificationsAPI = {
   }
 };
 
+// ========== ROLE UPGRADE REQUESTS ==========
+
+const ADMIN_REVIEW_EMAIL = 'Maximiliano.g.velasco@gmail.com';
+
+export const roleRequestsAPI = {
+  async getMine() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return [];
+
+    const { data, error } = await supabase
+      .from('role_upgrade_requests')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async submit(desiredRole, message = '') {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+    if (!['venue_member', 'club'].includes(desiredRole)) {
+      throw new Error('Tipo de solicitud invalido');
+    }
+
+    const { data: existing } = await supabase
+      .from('role_upgrade_requests')
+      .select('id, status')
+      .eq('user_id', session.user.id)
+      .eq('desired_role', desiredRole)
+      .in('status', ['pending', 'approved'])
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.status === 'approved') {
+      return { alreadyApproved: true };
+    }
+    if (existing?.status === 'pending') {
+      return { alreadyPending: true };
+    }
+
+    const { error } = await supabase
+      .from('role_upgrade_requests')
+      .insert({
+        user_id: session.user.id,
+        desired_role: desiredRole,
+        status: 'pending',
+        message: message || null,
+        target_email: ADMIN_REVIEW_EMAIL,
+      });
+    if (error) throw error;
+
+    return { ok: true };
+  },
+};
+
 // ========== CLUBS ==========
 
 export const clubsAPI = {
@@ -890,6 +949,50 @@ export const clubsAPI = {
     return data;
   },
 
+  async getMine() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesion');
+
+    const { data, error } = await supabase
+      .from('clubs')
+      .select('*')
+      .eq('creator_id', session.user.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+
+  async ensureMine(clubData = {}) {
+    const existing = await this.getMine().catch(() => null);
+    if (existing?.id) return existing;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesion');
+
+    const fullPayload = {
+      creator_id: session.user.id,
+      name: clubData.name || 'Mi club',
+      city: clubData.city || null,
+      zone: clubData.zone || null,
+      description: clubData.description || null,
+    };
+
+    let data;
+    let error;
+    ({ data, error } = await supabase.from('clubs').insert(fullPayload).select().single());
+    if (error) {
+      ({ data, error } = await supabase
+        .from('clubs')
+        .insert({ creator_id: session.user.id, name: clubData.name || 'Mi club' })
+        .select()
+        .single());
+      if (error) throw error;
+    }
+    return data;
+  },
+
   async getMembers(clubId) {
     const { data, error } = await supabase
       .from('club_members')
@@ -922,15 +1025,22 @@ export const clubsAPI = {
     if (error) throw error;
   },
 
-  async getRecruitments(clubId = null) {
+  async getRecruitments(filters = {}) {
+    const normalized = typeof filters === 'string'
+      ? { clubId: filters }
+      : (filters || {});
+
     let query = supabase
       .from('club_recruitments')
-      .select('*, clubs:club_id(name, city)')
+      .select('*, clubs:club_id(id, name, city, zone, creator_id)')
       .eq('status', 'open')
       .order('created_at', { ascending: false });
 
-    if (clubId) {
-      query = query.eq('club_id', clubId);
+    if (normalized.clubId) {
+      query = query.eq('club_id', normalized.clubId);
+    }
+    if (normalized.football_type) {
+      query = query.eq('football_type', parseInt(normalized.football_type));
     }
 
     const { data, error } = await query;
@@ -939,10 +1049,57 @@ export const clubsAPI = {
   },
 
   async createRecruitment(recruitmentData) {
-    const { error } = await supabase
-      .from('club_recruitments')
-      .insert(recruitmentData);
+    const { error } = await supabase.from('club_recruitments').insert(recruitmentData);
     if (error) throw error;
+  },
+
+  async createRecruitmentForMe(recruitmentData) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data: clubApproval } = await supabase
+      .from('role_upgrade_requests')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .eq('desired_role', 'club')
+      .eq('status', 'approved')
+      .limit(1)
+      .maybeSingle();
+
+    if (!clubApproval?.id) {
+      throw new Error('Necesitas aprobacion para usar modo club. Solicitalo desde tu perfil.');
+    }
+
+    const myClub = await this.ensureMine({
+      name: recruitmentData.club_name,
+      city: recruitmentData.city,
+      zone: recruitmentData.zone,
+      description: recruitmentData.club_description,
+    });
+
+    const fullPayload = {
+      club_id: myClub.id,
+      football_type: recruitmentData.football_type ? parseInt(recruitmentData.football_type) : null,
+      category: recruitmentData.category || null,
+      position_needed: recruitmentData.position_needed || null,
+      needed_players: recruitmentData.needed_players ? parseInt(recruitmentData.needed_players) : 1,
+      city: recruitmentData.city || null,
+      zone: recruitmentData.zone || null,
+      description: recruitmentData.description || null,
+      status: 'open',
+    };
+
+    let error;
+    ({ error } = await supabase.from('club_recruitments').insert(fullPayload));
+    if (error) {
+      const minimalPayload = {
+        club_id: myClub.id,
+        description: recruitmentData.description || null,
+        status: 'open',
+      };
+      ({ error } = await supabase.from('club_recruitments').insert(minimalPayload));
+      if (error) throw error;
+    }
   }
 };
 

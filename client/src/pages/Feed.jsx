@@ -1,10 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { matchesAPI, tournamentsAPI } from '../services/api';
+import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
-const FOOTBALL_TYPES = ['Todas', '5', '7', '11'];
-const REQUEST_TYPES = ['Todas', 'Match', 'Tournament'];
+const FOOTBALL_TYPES = [
+  { key: 'Todas', label: 'Todo futbol', value: null },
+  { key: 'futsal', label: 'Futsal', value: 5 },
+  { key: '5', label: 'F5', value: 5 },
+  { key: '7', label: 'F7', value: 7 },
+  { key: '8', label: 'F8', value: 8 },
+  { key: '11', label: 'F11', value: 11 },
+];
+const REQUEST_TYPES = ['Todas', 'Match', 'Tournament', 'Club'];
 const GENDER_FILTERS = ['Todos', 'Masculino', 'Femenino', 'Mixto'];
 
 function toLocalDate(dateStr) {
@@ -130,6 +137,7 @@ export default function Feed() {
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [tournaments, setTournaments] = useState([]);
+  const [clubRecruitments, setClubRecruitments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedFootballType, setSelectedFootballType] = useState('Todas');
@@ -141,7 +149,8 @@ export default function Feed() {
   const loadMatches = useCallback(async (showSpinner = false) => {
     try {
       if (showSpinner) setIsLoading(true);
-      const footballType = selectedFootballType === 'Todas' ? null : selectedFootballType;
+      const selectedFootballDef = FOOTBALL_TYPES.find((f) => f.key === selectedFootballType) || FOOTBALL_TYPES[0];
+      const footballType = selectedFootballDef.value;
       const matchData = await matchesAPI.getAll({ football_type: footballType }, user?.id);
       setMatches(matchData || []);
 
@@ -151,6 +160,14 @@ export default function Feed() {
       } catch (tErr) {
         console.warn('Tournaments load warning:', tErr);
         setTournaments([]);
+      }
+
+      try {
+        const recruitmentData = await clubsAPI.getRecruitments({ football_type: footballType });
+        setClubRecruitments(recruitmentData || []);
+      } catch (cErr) {
+        console.warn('Club recruitments load warning:', cErr);
+        setClubRecruitments([]);
       }
       setError(null);
     } catch (err) {
@@ -294,12 +311,42 @@ export default function Feed() {
       needed_players: t.needed_players ?? 1,
     }));
 
-    let merged = [...matchRows, ...tournamentRows];
+    const clubRows = (clubRecruitments || []).map((c) => ({
+      kind: 'Club',
+      id: c.id,
+      football_type: c.football_type,
+      address: c.zone || c.city || '',
+      city: c.city || c.clubs?.city || '',
+      zone: c.zone || c.clubs?.zone || '',
+      locationLabel: formatLocation('', c.city || c.clubs?.city || '', c.zone || c.clubs?.zone || ''),
+      date: c.created_at,
+      time: null,
+      joined: null,
+      total: null,
+      organizer_name: c.clubs?.name || 'Club',
+      organizer_id: c.clubs?.creator_id || null,
+      raw: c,
+      distanceKm: null,
+      match_gender: c.match_gender || 'mixto',
+      age_restricted: false,
+      min_age: null,
+      max_age: null,
+      goalkeepers_needed: null,
+      needed_players: c.needed_players ?? 1,
+      position_needed: c.position_needed || null,
+      category: c.category || null,
+    }));
+
+    let merged = [...matchRows, ...tournamentRows, ...clubRows];
 
     merged = merged.filter((row) => matchesProfileRestrictions(row, profile));
 
     if (selectedRequestType !== 'Todas') {
       merged = merged.filter((row) => row.kind === selectedRequestType);
+    }
+
+    if (selectedFootballType === 'futsal') {
+      merged = merged.filter((row) => row.football_type === 5 && String(row.raw?.match_kind || '').toLowerCase() === 'futsal');
     }
 
     if (selectedGender !== 'Todos') {
@@ -330,11 +377,11 @@ export default function Feed() {
       <div className="area-filter">
         {FOOTBALL_TYPES.map((type) => (
           <button
-            key={type}
-            className={`area-pill ${selectedFootballType === type ? 'active' : ''}`}
-            onClick={() => setSelectedFootballType(type)}
+            key={type.key}
+            className={`area-pill ${selectedFootballType === type.key ? 'active' : ''}`}
+            onClick={() => setSelectedFootballType(type.key)}
           >
-            {type === 'Todas' ? 'Todo futbol' : `F${type}`}
+            {type.label}
           </button>
         ))}
       </div>
@@ -390,13 +437,25 @@ export default function Feed() {
           <div
             key={`${req.kind}-${req.id}`}
             className="card match-card"
-            style={{ cursor: req.kind === 'Match' ? 'pointer' : 'default' }}
-            onClick={() => (req.kind === 'Match' ? navigate(`/match/${req.id}`) : null)}
+            style={{ cursor: req.kind === 'Match' ? 'pointer' : (req.kind === 'Club' && req.organizer_id ? 'pointer' : 'default') }}
+            onClick={() => {
+              if (req.kind === 'Match') {
+                navigate(`/match/${req.id}`);
+                return;
+              }
+              if (req.kind === 'Club' && req.organizer_id) {
+                navigate(`/users/${req.organizer_id}`);
+              }
+            }}
           >
             <div className="match-card-header">
               <div className="match-type">
-                <span className="match-type-icon">{req.kind === 'Match' ? '⚽' : '🏆'}</span>
-                <span className="match-type-label">{req.kind === 'Match' ? `Partido F${req.football_type}` : `Torneo F${req.football_type}`}</span>
+                <span className="match-type-icon">{req.kind === 'Match' ? '⚽' : (req.kind === 'Tournament' ? '🏆' : '🛡️')}</span>
+                <span className="match-type-label">
+                  {req.kind === 'Match'
+                    ? (String(req.raw?.match_kind || '').toLowerCase() === 'futsal' ? 'Partido Futsal' : `Partido F${req.football_type}`)
+                    : (req.kind === 'Tournament' ? `Torneo F${req.football_type}` : `Club F${req.football_type || '-'}`)}
+                </span>
               </div>
               <span className="badge badge-type">{req.match_gender || 'mixto'}</span>
             </div>
@@ -434,6 +493,17 @@ export default function Feed() {
                     {req.joined} / {req.total} jugadores{req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
                   </span>
                 </div>
+              ) : req.kind === 'Club' ? (
+                <>
+                  <div className="match-info-row">
+                    <span className="info-icon">🎯</span>
+                    <span>{req.position_needed ? `Buscan ${req.position_needed}` : 'Busqueda abierta de jugadores'}</span>
+                  </div>
+                  <div className="match-info-row">
+                    <span className="info-icon">👥</span>
+                    <span>Necesitan {req.needed_players} jugador{req.needed_players === 1 ? '' : 'es'}{req.category ? ` · ${req.category}` : ''}</span>
+                  </div>
+                </>
               ) : (
                 <div className="match-info-row">
                   <span className="info-icon">👥</span>
@@ -495,9 +565,21 @@ export default function Feed() {
                     </button>
                   );
                 })()
-              ) : (
+              ) : req.kind === 'Tournament' ? (
                 <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApplyTournament(req.id); }}>
                   Postularse
+                </button>
+              ) : (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (req.organizer_id) {
+                      navigate(`/users/${req.organizer_id}`);
+                    }
+                  }}
+                >
+                  Ver club
                 </button>
               )}
             </div>

@@ -31,9 +31,13 @@ function GuestRoute({ children }) {
 function AppRoutes() {
   const { loading, user, profile } = useAuth();
   const location = useLocation();
+  const profileType = profile?.profile_type;
 
   const needsProfileCompletion = Boolean(
-    user && (!profile?.birth_date || !profile?.gender || !profile?.profile_type)
+    user && (
+      !profileType ||
+      (profileType !== 'club' && (!profile?.birth_date || !profile?.gender))
+    )
   );
   
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;

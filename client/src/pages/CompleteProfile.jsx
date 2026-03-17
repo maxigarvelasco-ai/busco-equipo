@@ -8,7 +8,7 @@ export default function CompleteProfile() {
   const navigate = useNavigate();
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState('masculino');
-  const [profileType, setProfileType] = useState('normal');
+  const profileType = 'normal';
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,7 +16,6 @@ export default function CompleteProfile() {
     if (!profile) return;
     setBirthDate(profile.birth_date || '');
     setGender(profile.gender || 'masculino');
-    setProfileType(profile.profile_type || 'normal');
   }, [profile]);
 
   const handleSubmit = async (e) => {
@@ -111,14 +110,6 @@ export default function CompleteProfile() {
             <select className="form-select" value={gender} onChange={(e) => setGender(e.target.value)} required>
               <option value="masculino">Masculino</option>
               <option value="femenino">Femenino</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Tipo de perfil</label>
-            <select className="form-select" value={profileType} onChange={(e) => setProfileType(e.target.value)} required>
-              <option value="normal">Normal (jugador)</option>
-              <option value="venue_member">Miembro de canchas</option>
             </select>
           </div>
 

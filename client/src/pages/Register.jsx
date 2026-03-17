@@ -10,7 +10,6 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState('masculino');
-  const [profileType, setProfileType] = useState('normal');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -32,7 +31,14 @@ export default function Register() {
       if (years < 13 || years > 90) {
         throw new Error('La fecha de nacimiento debe dar una edad entre 13 y 90 años');
       }
-      const data = await register(name, email, password, profileType, birthDate, gender);
+      const data = await register(
+        name,
+        email,
+        password,
+        'normal',
+        birthDate,
+        gender
+      );
       // Supabase may require email confirmation
       if (data?.user && !data.session) {
         setSuccess(true);
@@ -133,13 +139,6 @@ export default function Register() {
                 <option value="femenino">Femenino</option>
               </select>
             </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Tipo de perfil</label>
-            <select className="form-select" value={profileType} onChange={(e) => setProfileType(e.target.value)}>
-              <option value="normal">Normal (jugador)</option>
-              <option value="venue_member">Miembro de canchas</option>
-            </select>
           </div>
           <button type="submit" className="btn btn-primary btn-lg btn-full" disabled={loading}>
             {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
