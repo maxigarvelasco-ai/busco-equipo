@@ -49,6 +49,16 @@ export default function TopHeader() {
         <button
           type="button"
           className="btn btn-secondary btn-sm"
+          style={{ minWidth: 44, height: 36, padding: '0 0.7rem' }}
+          onClick={() => navigate(user ? '/profile#buscar-perfiles' : '/login')}
+          aria-label="Buscar perfiles"
+          title="Buscar perfiles"
+        >
+          🔎
+        </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
           style={{ minWidth: 44, height: 36, position: 'relative', padding: '0 0.7rem' }}
           onClick={() => navigate(user ? '/notifications' : '/login')}
           aria-label="Notificaciones"

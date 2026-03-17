@@ -51,6 +51,15 @@ export default function Profile() {
     });
   }, [profile]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.location.hash !== '#buscar-perfiles') return;
+    const section = document.getElementById('buscar-perfiles');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [profile]);
+
   async function fetchData() {
     try {
       const [joined, abandoned, sub] = await Promise.all([
@@ -275,7 +284,7 @@ export default function Profile() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
+      <div id="buscar-perfiles" className="card" style={{ marginTop: 'var(--space-xl)' }}>
         <h3 style={{ marginBottom: '0.8rem' }}>Buscar perfiles</h3>
         <form onSubmit={handleSearchProfiles} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem' }}>
           <input
