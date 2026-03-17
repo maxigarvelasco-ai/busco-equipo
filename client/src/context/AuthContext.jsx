@@ -111,7 +111,7 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const register = async (name, email, password, profileType = 'normal', birthDate = null, gender = null) => {
+  const register = async (name, username, email, password, profileType = 'normal', birthDate = null, gender = null) => {
     const computedAge = birthDate
       ? Math.max(0, Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
       : null;
@@ -119,7 +119,7 @@ export function AuthProvider({ children }) {
       email,
       password,
       options: {
-        data: { name, profile_type: profileType, birth_date: birthDate, age: computedAge, gender },
+        data: { name, username, profile_type: profileType, birth_date: birthDate, age: computedAge, gender },
       },
     });
     if (error) throw error;
@@ -129,10 +129,13 @@ export function AuthProvider({ children }) {
         await supabase
           .from('profiles')
           .upsert(
-            { id: data.user.id, name, profile_type: profileType, birth_date: birthDate, age: computedAge, gender },
+            { id: data.user.id, name, username, profile_type: profileType, birth_date: birthDate, age: computedAge, gender },
             { onConflict: 'id' }
           );
-      } catch {
+      } catch (e) {
+        if (e?.code === '23505' || String(e?.message || '').toLowerCase().includes('username')) {
+          throw new Error('Ese nombre de usuario ya existe. Elegí otro.');
+        }
         // If email confirmation or RLS prevents this now, metadata still carries profile_type.
       }
     }

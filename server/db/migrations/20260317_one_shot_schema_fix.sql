@@ -9,6 +9,8 @@ alter table if exists public.profiles
 alter table if exists public.profiles
   add constraint profiles_profile_type_check check (profile_type in ('normal', 'venue_member', 'club'));
 alter table if exists public.profiles
+  add column if not exists username text;
+alter table if exists public.profiles
   add column if not exists club_name text,
   add column if not exists club_bio text,
   add column if not exists club_city text,
@@ -20,6 +22,9 @@ alter table if exists public.profiles
   add column if not exists venue_city text,
   add column if not exists venue_zone text,
   add column if not exists venue_phone text;
+
+create unique index if not exists profiles_username_unique_idx
+  on public.profiles (lower(username));
 
 -- 2) Matches/Tournaments football types: include F9.
 alter table if exists public.matches

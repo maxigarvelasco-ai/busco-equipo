@@ -23,6 +23,7 @@ export default function Profile() {
   const [roleRequestMsg, setRoleRequestMsg] = useState('');
   const [profileViewMode, setProfileViewMode] = useState('normal');
   const [editForm, setEditForm] = useState({
+    username: '',
     name: '',
     birth_date: '',
     gender: 'masculino',
@@ -53,6 +54,7 @@ export default function Profile() {
   useEffect(() => {
     if (!profile) return;
     setEditForm({
+      username: profile.username || '',
       name: profile.name || '',
       birth_date: profile.birth_date || '',
       gender: profile.gender || 'masculino',
@@ -150,6 +152,7 @@ export default function Profile() {
       const updates = isOrgMode
         ? (profileViewMode === 'club'
           ? {
+            username: String(editForm.username || '').trim().toLowerCase() || null,
             club_name: editForm.club_name || null,
             club_city: editForm.club_city || null,
             club_zone: editForm.club_zone || null,
@@ -159,6 +162,7 @@ export default function Profile() {
             is_profile_public: !!editForm.is_profile_public,
           }
           : {
+            username: String(editForm.username || '').trim().toLowerCase() || null,
             venue_name: editForm.venue_name || null,
             venue_city: editForm.venue_city || null,
             venue_zone: editForm.venue_zone || null,
@@ -167,6 +171,7 @@ export default function Profile() {
             is_profile_public: !!editForm.is_profile_public,
           })
         : {
+          username: String(editForm.username || '').trim().toLowerCase() || null,
           name: editForm.name,
           birth_date: editForm.birth_date || null,
           age: computedAge,
@@ -195,13 +200,26 @@ export default function Profile() {
       setIsEditingFicha(false);
       setTimeout(() => setSaveMsg(''), 2500);
     } catch (err) {
-      setSaveMsg(err.message || 'No se pudo guardar');
+      if (err?.code === '23505' || String(err?.message || '').toLowerCase().includes('username')) {
+        setSaveMsg('Ese nombre de usuario ya existe. Elegí otro.');
+      } else {
+        setSaveMsg(err.message || 'No se pudo guardar');
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  const initial = profile?.name ? profile.name[0].toUpperCase() : '?';
+  const usernameHandle = String(user?.email || '').split('@')[0] || '';
+  const profileIdentityName =
+    profile?.username ||
+    profile?.nickname ||
+    user?.user_metadata?.preferred_username ||
+    user?.user_metadata?.user_name ||
+    usernameHandle ||
+    profile?.name ||
+    '-';
+  const initial = profileIdentityName ? String(profileIdentityName)[0].toUpperCase() : '?';
   const joined = profile?.created_at
     ? new Date(profile.created_at).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })
     : '-';
@@ -210,7 +228,6 @@ export default function Profile() {
   const hasClubAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'club' && r.status === 'approved');
   const hasVenueAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'venue_member' && r.status === 'approved');
   const isOrgMode = profileViewMode !== 'normal';
-  const profileIdentityName = profile?.name || profile?.nickname || (String(user?.email || '').split('@')[0]) || '-';
   const activeName = profileViewMode === 'club'
     ? (profile?.club_name || '-')
     : (profileViewMode === 'venue' ? (profile?.venue_name || '-') : (profile?.name || '-'));
@@ -312,6 +329,9 @@ export default function Profile() {
         <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
           {user.email}
         </div>
+        <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+          @{profile?.username || profileIdentityName}
+        </div>
         {/* En un caso real mostrarías esto si el perfil es de OTRO usuario */}
         {/* <button className="btn btn-sm btn-secondary" style={{ marginTop: '0.5rem' }} onClick={() => setShowReportModal(true)}>
           🚩 Reportar Usuario
@@ -407,6 +427,19 @@ export default function Profile() {
           </div>
         ) : (
         <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: '0.75rem' }}>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Nombre de usuario</label>
+              <input
+                className="form-input"
+                value={editForm.username}
+                onChange={(e) => setEditForm((p) => ({ ...p, username: e.target.value.toLowerCase() }))}
+                pattern="[a-z0-9_]{3,24}"
+                required
+              />
+            </div>
+          </div>
+
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">{isOrgMode ? 'Nombre del club/cancha' : 'Nombre'}</label>

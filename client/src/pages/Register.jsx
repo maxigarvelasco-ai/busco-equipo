@@ -6,6 +6,7 @@ export default function Register() {
   const { register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -17,6 +18,11 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const normalizedUsername = String(username || '').trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,24}$/.test(normalizedUsername)) {
+      setError('El nombre de usuario debe tener 3-24 caracteres: letras, números o guion bajo');
+      return;
+    }
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres');
       return;
@@ -33,6 +39,7 @@ export default function Register() {
       }
       const data = await register(
         name,
+        normalizedUsername,
         email,
         password,
         'normal',
@@ -95,6 +102,17 @@ export default function Register() {
               placeholder="Tu nombre"
               value={name}
               onChange={e => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Nombre de usuario</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="ej: maxig10"
+              value={username}
+              onChange={e => setUsername(e.target.value.toLowerCase())}
               required
             />
           </div>

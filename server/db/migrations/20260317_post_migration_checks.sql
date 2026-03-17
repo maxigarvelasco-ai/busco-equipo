@@ -18,7 +18,7 @@ select table_name, column_name
 from information_schema.columns
 where table_schema = 'public'
   and (
-    (table_name = 'profiles' and column_name in ('profile_type', 'birth_date', 'club_name', 'club_bio', 'club_city', 'club_zone', 'club_phone', 'club_contact_visible', 'venue_name', 'venue_bio', 'venue_city', 'venue_zone', 'venue_phone')) or
+    (table_name = 'profiles' and column_name in ('username', 'profile_type', 'birth_date', 'club_name', 'club_bio', 'club_city', 'club_zone', 'club_phone', 'club_contact_visible', 'venue_name', 'venue_bio', 'venue_city', 'venue_zone', 'venue_phone')) or
     (table_name = 'clubs' and column_name in ('id', 'creator_id', 'name', 'address', 'phone', 'city', 'zone', 'description', 'created_at')) or
     (table_name = 'club_recruitments' and column_name in ('club_id', 'football_type', 'status', 'created_at')) or
     (table_name = 'role_upgrade_requests' and column_name in ('user_id', 'desired_role', 'status', 'target_email', 'updated_at'))

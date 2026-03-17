@@ -104,6 +104,7 @@ export default function UserProfile() {
           )}
           <div>
             <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{profile.name || 'Sin nombre'}</div>
+            <div style={{ color: '#666', fontSize: '0.9rem' }}>@{profile.username || 'sin_usuario'}</div>
             <div style={{ color: '#666', fontSize: '0.9rem' }}>ID: {profile.id}</div>
           </div>
         </div>

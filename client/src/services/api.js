@@ -453,13 +453,13 @@ export const profilesAPI = {
     const trimmed = term?.trim() || '';
     let query = supabase
       .from('profiles')
-      .select('id, name, avatar_url, city, zone, preferred_position, skill_level, profile_type')
+      .select('id, username, name, avatar_url, city, zone, preferred_position, skill_level, profile_type')
       .eq('is_profile_public', true)
       .order('name', { ascending: true })
       .limit(20);
 
     if (trimmed) {
-      query = query.or(`name.ilike.%${trimmed}%,nickname.ilike.%${trimmed}%,city.ilike.%${trimmed}%,zone.ilike.%${trimmed}%`);
+      query = query.or(`username.ilike.%${trimmed}%,name.ilike.%${trimmed}%,nickname.ilike.%${trimmed}%,city.ilike.%${trimmed}%,zone.ilike.%${trimmed}%`);
     }
     if (currentUserId) {
       query = query.neq('id', currentUserId);
