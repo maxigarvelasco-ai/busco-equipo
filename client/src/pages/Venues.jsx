@@ -41,6 +41,15 @@ function formatLocation(address, city, zone) {
   return compact.filter(Boolean).join(', ');
 }
 
+function normalizeAddressLabel(value) {
+  const parts = String(value || '').split(',').map((p) => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return String(value || '').trim();
+  const street = parts[0];
+  const city = parts.length > 2 ? parts[1] : '';
+  const country = countryAbbrFromText(parts[parts.length - 1]);
+  return [street, city, country].filter(Boolean).join(', ');
+}
+
 export default function Venues() {
   const { user, profile } = useAuth();
   const [venues, setVenues] = useState([]);
@@ -80,7 +89,7 @@ export default function Venues() {
       language: 'es',
     });
     return predictions.map((p) => ({
-      label: p.description,
+      label: normalizeAddressLabel(p.description),
       city: inferCityFromPrediction(p),
     }));
   };
@@ -180,10 +189,11 @@ export default function Venues() {
     try {
       setCreating(true);
       const inferredCity = form.inferred_city || inferCityFromText(form.address) || null;
+      const normalizedAddress = normalizeAddressLabel(form.address || '');
       if (!inferredCity) {
         throw new Error('Seleccioná una dirección que incluya ciudad');
       }
-      await venuesAPI.create({ ...form, city: inferredCity, address: form.address.trim() });
+      await venuesAPI.create({ ...form, city: inferredCity, address: normalizedAddress || form.address.trim() });
       setForm({ name: '', address: '', inferred_city: '', football_types: [], services: [] });
       setShowCreate(false);
       const data = await venuesAPI.getAll({});

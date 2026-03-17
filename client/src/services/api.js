@@ -113,7 +113,7 @@ export const matchesAPI = {
       address: matchData.address || null,
       latitude: matchData.latitude || null,
       longitude: matchData.longitude || null,
-      zone: matchData.zone,
+      zone: matchData.zone || matchData.address || matchData.city || 'Sin zona',
       match_date: matchData.match_date,
       match_time: matchData.match_time,
       max_players: matchData.max_players,
@@ -137,7 +137,9 @@ export const matchesAPI = {
       const minimalPayload = {
         creator_id: session.user.id,
         football_type: matchData.football_type,
-        zone: matchData.zone || matchData.city || 'Sin zona',
+        city: matchData.city || null,
+        address: matchData.address || null,
+        zone: matchData.zone || matchData.address || matchData.city || 'Sin zona',
         match_date: matchData.match_date,
         match_time: matchData.match_time,
         max_players: matchData.max_players,
@@ -577,7 +579,7 @@ export const venuesAPI = {
       name: venueData.name,
       address: venueData.address || null,
       city: venueData.city || null,
-      zone: venueData.city || null,
+      zone: venueData.zone || venueData.address || venueData.city || null,
       football_types: venueData.football_types || [],
       services: venueData.services || [],
       amenities: venueData.services || [],
@@ -591,7 +593,8 @@ export const venuesAPI = {
         owner_id: session.user.id,
         name: venueData.name,
         address: venueData.address || null,
-        zone: venueData.city || null,
+        city: venueData.city || null,
+        zone: venueData.zone || venueData.address || venueData.city || null,
       };
       ({ data, error } = await supabase.from('venues').insert(minimalPayload).select().single());
       if (error) throw error;
@@ -649,7 +652,7 @@ export const tournamentsAPI = {
       entry_price: tournamentData.entry_price || 0,
       description: tournamentData.description || null,
       city: tournamentData.city || null,
-      zone: tournamentData.city || null,
+      zone: tournamentData.zone || tournamentData.venue_name || tournamentData.city || null,
       venue_name: tournamentData.venue_name || null,
       needed_players: tournamentData.needed_players ? parseInt(tournamentData.needed_players) : 1,
       match_gender: tournamentData.match_gender || 'mixto',
@@ -671,6 +674,9 @@ export const tournamentsAPI = {
         max_teams: tournamentData.max_teams || 2,
         entry_price: tournamentData.entry_price || 0,
         description: tournamentData.description || null,
+        city: tournamentData.city || null,
+        zone: tournamentData.zone || tournamentData.venue_name || tournamentData.city || null,
+        venue_name: tournamentData.venue_name || null,
       };
       ({ data, error } = await supabase.from('tournaments').insert(minimalPayload).select().single());
       if (error) throw error;

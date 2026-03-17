@@ -63,7 +63,7 @@ export default function CreateMatch() {
       language: 'es',
     });
     return predictions.map((p) => ({
-      label: p.description,
+      label: normalizeAddressLabel(p.description),
       placeId: p.place_id,
       city: inferCityFromPrediction(p),
     }));
@@ -92,6 +92,40 @@ export default function CreateMatch() {
       .map((p) => p.trim())
       .filter(Boolean);
     return parts.length >= 2 ? parts[1] : '';
+  };
+
+  const countryAbbrFromText = (raw) => {
+    const text = String(raw || '').trim();
+    if (!text) return '';
+    if (/^[A-Z]{2}$/.test(text)) return text;
+    const map = {
+      argentina: 'AR',
+      uruguay: 'UY',
+      paraguay: 'PY',
+      chile: 'CL',
+      bolivia: 'BO',
+      brasil: 'BR',
+      brazil: 'BR',
+      peru: 'PE',
+      ecuador: 'EC',
+      colombia: 'CO',
+      venezuela: 'VE',
+      mexico: 'MX',
+      'estados unidos': 'US',
+      'united states': 'US',
+      espana: 'ES',
+      spain: 'ES',
+    };
+    return map[text.toLowerCase()] || text.slice(0, 2).toUpperCase();
+  };
+
+  const normalizeAddressLabel = (value) => {
+    const parts = String(value || '').split(',').map((p) => p.trim()).filter(Boolean);
+    if (parts.length <= 1) return String(value || '').trim();
+    const street = parts[0];
+    const city = parts.length > 2 ? parts[1] : '';
+    const country = countryAbbrFromText(parts[parts.length - 1]);
+    return [street, city, country].filter(Boolean).join(', ');
   };
 
   const detectMyLocation = async () => {
@@ -192,7 +226,7 @@ export default function CreateMatch() {
           throw new Error('El rango de edad no es válido');
         }
         const inferredCity = matchForm.inferred_city || inferCityFromText(matchForm.venue) || null;
-        const normalizedAddress = matchForm.venue.trim();
+        const normalizedAddress = normalizeAddressLabel(matchForm.venue.trim());
         await matchesAPI.create({
           football_type: parseInt(footballType),
           title: `Partido F${footballType}`,
@@ -200,7 +234,7 @@ export default function CreateMatch() {
           address: normalizedAddress,
           latitude: null,
           longitude: null,
-          zone: inferredCity || normalizedAddress,
+          zone: normalizedAddress || inferredCity,
           match_date: matchForm.date,
           match_time: matchForm.time,
           max_players: Math.max(parseInt(matchForm.needed_players || '1') + 1, 2),
@@ -227,6 +261,7 @@ export default function CreateMatch() {
           throw new Error('El rango de edad no es válido');
         }
         const inferredCity = tournamentForm.inferred_city || inferCityFromText(tournamentForm.venue) || null;
+        const normalizedAddress = normalizeAddressLabel(tournamentForm.venue?.trim() || '');
         await tournamentsAPI.create({
           name: tournamentForm.name,
           football_type: parseInt(footballType),
@@ -234,7 +269,8 @@ export default function CreateMatch() {
           max_teams: 2,
           entry_price: 0,
           city: inferredCity,
-          venue_name: tournamentForm.venue?.trim() || null,
+          venue_name: normalizedAddress || tournamentForm.venue?.trim() || null,
+          zone: normalizedAddress || inferredCity,
           match_gender: tournamentForm.match_gender,
           age_restricted: !!tournamentForm.age_restricted,
           min_age: tournamentForm.age_restricted ? parseInt(tournamentForm.min_age || '0') : null,
