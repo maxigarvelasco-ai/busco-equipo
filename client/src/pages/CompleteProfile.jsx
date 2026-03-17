@@ -31,23 +31,46 @@ export default function CompleteProfile() {
 
     setSaving(true);
     try {
-      await supabase
+      const payload = {
+        age: parsedAge,
+        gender,
+        profile_type: profileType,
+      };
+
+      const { data: updated, error: updateError } = await supabase
         .from('profiles')
-        .upsert(
-          {
+        .update(payload)
+        .eq('id', user.id)
+        .select('id')
+        .maybeSingle();
+
+      if (updateError) throw updateError;
+
+      if (!updated) {
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
             id: user.id,
-            name: profile?.name || user.email?.split('@')[0] || 'Usuario',
+            name: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario',
             age: parsedAge,
             gender,
             profile_type: profileType,
-          },
-          { onConflict: 'id' }
-        );
+          });
+        if (insertError) throw insertError;
+      }
+
+      await supabase.auth.updateUser({
+        data: {
+          age: parsedAge,
+          gender,
+          profile_type: profileType,
+        },
+      });
 
       await fetchProfile(user.id);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err.message || 'No se pudo guardar');
+      setError(err?.message || 'No se pudo guardar');
     } finally {
       setSaving(false);
     }
