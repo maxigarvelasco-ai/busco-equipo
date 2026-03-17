@@ -666,26 +666,36 @@ export const tournamentsAPI = {
       visibility: 'public',
     };
 
-    let data;
-    let error;
-    ({ data, error } = await supabase.from('tournaments').insert(fullPayload).select().single());
-    if (error) {
-      const minimalPayload = {
+    const payloads = [
+      fullPayload,
+      // Retry without optional columns that may not exist in older DB schemas.
+      {
         organizer_id: session.user.id,
         name: tournamentData.name,
         football_type: parseInt(tournamentData.football_type),
         start_date: tournamentData.start_date,
         max_teams: tournamentData.max_teams || 2,
         entry_price: tournamentData.entry_price || 0,
-        description: tournamentData.description || null,
         city: tournamentData.city || null,
         zone: tournamentData.zone || tournamentData.venue_name || tournamentData.city || null,
         venue_name: tournamentData.venue_name || null,
-      };
-      ({ data, error } = await supabase.from('tournaments').insert(minimalPayload).select().single());
-      if (error) throw error;
+      },
+      {
+        organizer_id: session.user.id,
+        name: tournamentData.name,
+        football_type: parseInt(tournamentData.football_type),
+        start_date: tournamentData.start_date,
+      },
+    ];
+
+    let lastError = null;
+    for (const payload of payloads) {
+      const { data, error } = await supabase.from('tournaments').insert(payload).select().single();
+      if (!error) return data;
+      lastError = error;
     }
-    return data;
+
+    throw lastError || new Error('No se pudo crear el torneo');
   },
 
   async applyRequest(tournamentId) {
@@ -1085,6 +1095,7 @@ export const clubsAPI = {
       needed_players: recruitmentData.needed_players ? parseInt(recruitmentData.needed_players) : 1,
       city: recruitmentData.city || null,
       zone: recruitmentData.zone || null,
+      match_gender: recruitmentData.match_gender || 'mixto',
       description: recruitmentData.description || null,
       status: 'open',
     };

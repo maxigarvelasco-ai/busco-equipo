@@ -43,6 +43,7 @@ export default function CreateMatch() {
     club_name: '',
     category: '',
     position_needed: '',
+    match_gender: 'mixto',
     city: '',
     zone: '',
     needed_players: '1',
@@ -340,6 +341,7 @@ export default function CreateMatch() {
           football_type: parseInt(footballType),
           category: clubForm.category.trim() || null,
           position_needed: clubForm.position_needed.trim(),
+          match_gender: clubForm.match_gender,
           city: clubForm.city.trim() || null,
           zone: clubForm.zone.trim() || null,
           needed_players: parseInt(clubForm.needed_players || '1'),
@@ -649,6 +651,18 @@ export default function CreateMatch() {
                   required
                 />
               </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Genero del equipo/categoria</label>
+              <select
+                className="form-select"
+                value={clubForm.match_gender}
+                onChange={(e) => setClubForm((p) => ({ ...p, match_gender: e.target.value }))}
+              >
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+                <option value="mixto">Mixto</option>
+              </select>
             </div>
             <div className="form-row">
               <div className="form-group">

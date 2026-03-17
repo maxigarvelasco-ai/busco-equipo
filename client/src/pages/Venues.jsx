@@ -58,6 +58,8 @@ export default function Venues() {
   const [canManageVenues, setCanManageVenues] = useState(false);
   const [loadingRoleAccess, setLoadingRoleAccess] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [createSuccess, setCreateSuccess] = useState('');
   const [form, setForm] = useState({
     name: '',
     address: '',
@@ -195,7 +197,7 @@ export default function Venues() {
     fetchRoleAccess();
     fetchVenues();
     detectMyLocation();
-  }, []);
+  }, [user]);
 
   const toggleInArray = (key, value) => {
     setForm((prev) => {
@@ -209,6 +211,8 @@ export default function Venues() {
 
   const handleCreateVenue = async (e) => {
     e.preventDefault();
+    setCreateError('');
+    setCreateSuccess('');
     try {
       setCreating(true);
       const inferredCity = form.inferred_city || inferCityFromText(form.address) || null;
@@ -216,13 +220,18 @@ export default function Venues() {
       if (!inferredCity) {
         throw new Error('Seleccioná una dirección que incluya ciudad');
       }
-      await venuesAPI.create({ ...form, city: inferredCity, address: normalizedAddress || form.address.trim() });
+      const created = await venuesAPI.create({ ...form, city: inferredCity, address: normalizedAddress || form.address.trim() });
       setForm({ name: '', address: '', inferred_city: '', football_types: [], services: [] });
       setShowCreate(false);
-      const data = await venuesAPI.getAll({});
-      setVenues(data);
-    } catch {
-      // keep minimal flow
+      setCreateSuccess('Cancha guardada correctamente');
+      if (created) {
+        setVenues((prev) => [created, ...(prev || [])]);
+      } else {
+        const data = await venuesAPI.getAll({});
+        setVenues(data);
+      }
+    } catch (err) {
+      setCreateError(err?.message || 'No se pudo guardar la cancha');
     } finally {
       setCreating(false);
     }
@@ -279,6 +288,7 @@ export default function Venues() {
 
       {showCreate && (
         <form className="card" onSubmit={handleCreateVenue} style={{ marginBottom: '0.7rem' }}>
+          {createError && <div className="form-error" style={{ marginBottom: '0.6rem' }}>{createError}</div>}
           <div className="form-group">
             <label className="form-label">Nombre</label>
             <input className="form-input" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} required />
@@ -345,6 +355,12 @@ export default function Venues() {
           </button>
 
         </form>
+      )}
+
+      {createSuccess && (
+        <div className="card" style={{ marginBottom: '0.7rem', padding: '0.65rem', color: 'var(--color-primary)' }}>
+          {createSuccess}
+        </div>
       )}
 
       {loading ? (

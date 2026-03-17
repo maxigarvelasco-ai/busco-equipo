@@ -21,6 +21,7 @@ export default function Profile() {
   const [roleRequests, setRoleRequests] = useState([]);
   const [sendingRoleRequest, setSendingRoleRequest] = useState('');
   const [roleRequestMsg, setRoleRequestMsg] = useState('');
+  const [profileViewMode, setProfileViewMode] = useState('normal');
   const [editForm, setEditForm] = useState({
     name: '',
     birth_date: '',
@@ -91,9 +92,9 @@ export default function Profile() {
     setSaveMsg('');
     setSaving(true);
     try {
-      const isClubProfile = profile?.profile_type === 'club';
+      const isOrgMode = profileViewMode !== 'normal';
       let computedAge = null;
-      if (!isClubProfile) {
+      if (!isOrgMode) {
         const birth = new Date(editForm.birth_date);
         if (Number.isNaN(birth.getTime())) {
           throw new Error('Ingresá una fecha de nacimiento válida');
@@ -106,9 +107,9 @@ export default function Profile() {
 
       const updates = {
         name: editForm.name,
-        birth_date: isClubProfile ? null : (editForm.birth_date || null),
-        age: computedAge,
-        gender: isClubProfile ? null : (editForm.gender || null),
+        birth_date: isOrgMode ? (profile?.birth_date || null) : (editForm.birth_date || null),
+        age: isOrgMode ? (profile?.age ?? null) : computedAge,
+        gender: isOrgMode ? (profile?.gender || null) : (editForm.gender || null),
         city: editForm.city || null,
         zone: editForm.zone || null,
         preferred_position: editForm.preferred_position || null,
@@ -129,13 +130,31 @@ export default function Profile() {
     }
   }
 
+  const initial = profile?.name ? profile.name[0].toUpperCase() : '?';
+  const joined = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' })
+    : '-';
+  const isPro = subscription && new Date(subscription.expires_at) > new Date();
+  const isReviewer = String(user?.email || '').toLowerCase() === 'maximiliano.g.velasco@gmail.com';
+  const hasClubAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'club' && r.status === 'approved');
+  const hasVenueAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'venue_member' && r.status === 'approved');
+  const isOrgMode = profileViewMode !== 'normal';
+  const profileViewLabel = profileViewMode === 'club'
+    ? 'Mi ficha de club'
+    : (profileViewMode === 'venue' ? 'Mi ficha de cancha' : 'Mi ficha de jugador');
+
+  useEffect(() => {
+    if (profileViewMode === 'club' && !hasClubAccess) {
+      setProfileViewMode('normal');
+      return;
+    }
+    if (profileViewMode === 'venue' && !hasVenueAccess) {
+      setProfileViewMode('normal');
+    }
+  }, [profileViewMode, hasClubAccess, hasVenueAccess]);
+
   if (!user) return null;
   if (!profile) return <div className="page-content"><div className="loading-spinner"><div className="spinner"></div></div></div>;
-
-  const initial = profile.name ? profile.name[0].toUpperCase() : '?';
-  const joined = new Date(profile.created_at).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' });
-  const isPro = subscription && new Date(subscription.expires_at) > new Date();
-  const isClubProfile = profile?.profile_type === 'club';
 
   async function handleSearchProfiles(e) {
     e.preventDefault();
@@ -228,7 +247,7 @@ export default function Profile() {
 
       <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
-          <h3>{isClubProfile ? 'Mi ficha de club' : 'Mi ficha de jugador'}</h3>
+          <h3>{profileViewLabel}</h3>
           {!isEditingFicha ? (
             <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingFicha(true)}>
               Editar ficha
@@ -240,14 +259,42 @@ export default function Profile() {
           )}
         </div>
 
+        {(hasClubAccess || hasVenueAccess) && (
+          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${profileViewMode === 'normal' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setProfileViewMode('normal')}
+            >
+              Ver como normal
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${profileViewMode === 'club' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setProfileViewMode('club')}
+              disabled={!hasClubAccess}
+            >
+              Ver como club
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${profileViewMode === 'venue' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setProfileViewMode('venue')}
+              disabled={!hasVenueAccess}
+            >
+              Ver como cancha
+            </button>
+          </div>
+        )}
+
         {!isEditingFicha ? (
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="match-info-row"><span className="info-icon">🧍</span><span><strong>Nombre:</strong> {profile.name || '-'}</span></div>
-            {!isClubProfile && <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>}
-            {!isClubProfile && <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>}
+            {!isOrgMode && <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>}
+            {!isOrgMode && <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>}
             <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[profile.city, profile.zone].filter(Boolean).join(' - ') || '-'}</span></div>
-            {!isClubProfile && <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>}
-            {!isClubProfile && <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>}
+            {!isOrgMode && <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>}
+            {!isOrgMode && <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>}
             <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {profile.bio || '-'}</span></div>
             <div className="match-info-row"><span className="info-icon">📞</span><span><strong>Teléfono:</strong> {profile.phone || '-'}</span></div>
           </div>
@@ -260,7 +307,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {!isClubProfile && <div className="form-row">
+          {!isOrgMode && <div className="form-row">
             <div className="form-group">
               <label className="form-label">Fecha de nacimiento</label>
               <input type="date" className="form-input" value={editForm.birth_date} onChange={(e) => setEditForm((p) => ({ ...p, birth_date: e.target.value }))} required />
@@ -285,7 +332,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {!isClubProfile && <div className="form-row">
+          {!isOrgMode && <div className="form-row">
             <div className="form-group">
               <label className="form-label">Posición</label>
               <input className="form-input" value={editForm.preferred_position} onChange={(e) => setEditForm((p) => ({ ...p, preferred_position: e.target.value }))} placeholder="Ej: Volante" />
