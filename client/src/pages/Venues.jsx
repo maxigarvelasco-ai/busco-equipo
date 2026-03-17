@@ -35,6 +35,56 @@ export default function Venues() {
     return window.__buscoEquipoPlacesService;
   };
 
+  const fetchAddressSuggestions = async (query) => {
+    if (!window.google?.maps) return [];
+
+    try {
+      const placesLib = await window.google.maps.importLibrary('places');
+      const Suggestion = placesLib?.AutocompleteSuggestion;
+      if (Suggestion?.fetchAutocompleteSuggestions) {
+        const response = await Suggestion.fetchAutocompleteSuggestions({
+          input: query,
+          language: 'es',
+        });
+        const raw = response?.suggestions || [];
+        const mapped = raw.map((s) => {
+          const p = s?.placePrediction;
+          const label =
+            p?.text?.text
+            || p?.structuredFormat?.mainText?.text
+            || p?.mainText?.text
+            || '';
+          const secondary =
+            p?.structuredFormat?.secondaryText?.text
+            || p?.secondaryText?.text
+            || '';
+          const full = secondary ? `${label}, ${secondary}` : label;
+          const city = secondary ? secondary.split(',')[0].trim() : '';
+          return {
+            label: full,
+            city,
+          };
+        }).filter((x) => x.label);
+
+        if (mapped.length > 0) return mapped;
+      }
+    } catch {
+      // fallback below
+    }
+
+    const service = getPlacesAutocompleteService();
+    if (!service) return [];
+    const legacy = await getPredictions(service, {
+      input: query,
+      types: ['geocode'],
+      language: 'es',
+    });
+    return legacy.map((p) => ({
+      label: p.description,
+      city: inferCityFromPrediction(p),
+    }));
+  };
+
   const inferCityFromPrediction = (prediction) => {
     const terms = prediction?.terms || [];
     if (terms.length >= 2) return terms[1]?.value || '';
@@ -148,30 +198,20 @@ export default function Venues() {
 
     let cancelled = false;
     const timeoutId = setTimeout(async () => {
-      const service = getPlacesAutocompleteService();
-      if (!service) {
+      if (!window.google?.maps?.places) {
         if (!cancelled) setAddressSuggestions([]);
         return;
       }
 
-      const req = {
-        input: query,
-        types: ['geocode'],
-        language: 'es',
-      };
-
-      const geoPredictions = await getPredictions(service, req);
+      const geoPredictions = await fetchAddressSuggestions(query);
 
       if (cancelled) return;
       const normalizedQuery = query.toLowerCase();
-      const startsWith = geoPredictions.filter((p) => (p.description || '').toLowerCase().startsWith(normalizedQuery));
-      const fallback = geoPredictions.filter((p) => (p.description || '').toLowerCase().includes(normalizedQuery));
+      const startsWith = geoPredictions.filter((p) => (p.label || '').toLowerCase().startsWith(normalizedQuery));
+      const fallback = geoPredictions.filter((p) => (p.label || '').toLowerCase().includes(normalizedQuery));
       const top = (startsWith.length ? startsWith : fallback).slice(0, 8);
 
-      setAddressSuggestions(top.map((p) => ({
-        label: p.description,
-        city: inferCityFromPrediction(p),
-      })));
+      setAddressSuggestions(top);
       setShowAddressSuggestions(true);
     }, 260);
 
