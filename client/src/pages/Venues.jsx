@@ -23,6 +23,14 @@ export default function Venues() {
   const [citySuggestions, setCitySuggestions] = useState([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
 
+  const getPlacesAutocompleteService = () => {
+    if (!window.google?.maps?.places?.AutocompleteService) return null;
+    if (!window.__buscoEquipoPlacesService) {
+      window.__buscoEquipoPlacesService = new window.google.maps.places.AutocompleteService();
+    }
+    return window.__buscoEquipoPlacesService;
+  };
+
   const canManageVenues = user && profile?.profile_type === 'venue_member';
 
   useEffect(() => {
@@ -75,30 +83,38 @@ export default function Venues() {
 
     let cancelled = false;
     const timeoutId = setTimeout(async () => {
-      try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=ar&q=${encodeURIComponent(query)}`;
-        const res = await fetch(url, { headers: { Accept: 'application/json' } });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled) return;
-
-        const normalizedQuery = query.toLowerCase();
-        const rawLabels = (data || []).map((item) => {
-          const city = item?.address?.city || item?.address?.town || item?.address?.village;
-          const road = item?.address?.road;
-          const first = item?.display_name?.split(',')?.[0];
-          return city || road || first || '';
-        }).filter(Boolean);
-
-        const startsWith = rawLabels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
-        const fallback = rawLabels.filter((label) => label.toLowerCase().includes(normalizedQuery));
-        const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
-
-        setCitySuggestions(names);
-        setShowCitySuggestions(true);
-      } catch {
+      const service = getPlacesAutocompleteService();
+      if (!service) {
         if (!cancelled) setCitySuggestions([]);
+        return;
       }
+
+      const predictions = await new Promise((resolve) => {
+        service.getPlacePredictions(
+          {
+            input: query,
+            types: ['(cities)'],
+            componentRestrictions: { country: 'ar' },
+          },
+          (result, status) => {
+            const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
+            resolve(ok ? (result || []) : []);
+          }
+        );
+      });
+
+      if (cancelled) return;
+      const normalizedQuery = query.toLowerCase();
+      const labels = predictions
+        .map((p) => p.description)
+        .filter(Boolean);
+
+      const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
+      const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
+      const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
+
+      setCitySuggestions(names);
+      setShowCitySuggestions(true);
     }, 260);
 
     return () => {
