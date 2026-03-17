@@ -1,15 +1,15 @@
 begin;
 
--- 1) Allow extra football type (F8) in core entities
+-- 1) Allow extra football type (F9) in core entities
 alter table if exists public.matches
   drop constraint if exists matches_football_type_check;
 alter table if exists public.matches
-  add constraint matches_football_type_check check (football_type in (5, 7, 8, 11));
+  add constraint matches_football_type_check check (football_type in (5, 7, 9, 11));
 
 alter table if exists public.tournaments
   drop constraint if exists tournaments_football_type_check;
 alter table if exists public.tournaments
-  add constraint tournaments_football_type_check check (football_type in (5, 7, 8, 11));
+  add constraint tournaments_football_type_check check (football_type in (5, 7, 9, 11));
 
 alter table if exists public.club_recruitments
   add column if not exists football_type int;
@@ -17,7 +17,7 @@ alter table if exists public.club_recruitments
 alter table if exists public.club_recruitments
   drop constraint if exists club_recruitments_football_type_check;
 alter table if exists public.club_recruitments
-  add constraint club_recruitments_football_type_check check (football_type in (5, 7, 8, 11) or football_type is null);
+  add constraint club_recruitments_football_type_check check (football_type in (5, 7, 9, 11) or football_type is null);
 
 -- 2) Requests for privileged role access (venue owner / club)
 create table if not exists public.role_upgrade_requests (

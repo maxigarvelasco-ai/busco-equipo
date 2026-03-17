@@ -37,6 +37,7 @@ export default function Profile() {
     club_zone: '',
     club_bio: '',
     club_phone: '',
+    club_contact_visible: false,
     venue_name: '',
     venue_city: '',
     venue_zone: '',
@@ -66,6 +67,7 @@ export default function Profile() {
       club_zone: profile.club_zone || '',
       club_bio: profile.club_bio || '',
       club_phone: profile.club_phone || '',
+      club_contact_visible: !!profile.club_contact_visible,
       venue_name: profile.venue_name || '',
       venue_city: profile.venue_city || '',
       venue_zone: profile.venue_zone || '',
@@ -153,6 +155,7 @@ export default function Profile() {
             club_zone: editForm.club_zone || null,
             club_bio: editForm.club_bio || null,
             club_phone: editForm.club_phone || null,
+            club_contact_visible: !!editForm.club_contact_visible,
             is_profile_public: !!editForm.is_profile_public,
           }
           : {
@@ -510,6 +513,17 @@ export default function Profile() {
               required={isOrgMode}
             />
           </div>
+
+          {isOrgMode && profileViewMode === 'club' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input
+                type="checkbox"
+                checked={!!editForm.club_contact_visible}
+                onChange={(e) => setEditForm((p) => ({ ...p, club_contact_visible: e.target.checked }))}
+              />
+              Mostrar mi nombre de usuario como contacto en la card del club
+            </label>
+          )}
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <input type="checkbox" checked={editForm.is_profile_public} onChange={(e) => setEditForm((p) => ({ ...p, is_profile_public: e.target.checked }))} />

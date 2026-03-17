@@ -208,6 +208,10 @@ export default function MatchDetail() {
   const ownerId = match.owner_id ?? match.creator_id ?? null;
   const isCreator = Boolean(user && ownerId && String(user.id) === String(ownerId));
   const locationLabel = formatLocation(match.address, match.city, match.zone);
+  const joinedTotal = Math.max(Number(players.length || 0), 0);
+  const neededPlayers = Math.max(Number(match.max_players || 1) - 1, 1);
+  const joinedNeededPlayers = Math.max(joinedTotal - 1, 0);
+  const missingNeededPlayers = Math.max(neededPlayers - joinedNeededPlayers, 0);
 
   return (
     <div className="page-content" style={{ paddingBottom: '80px' }}>
@@ -237,6 +241,10 @@ export default function MatchDetail() {
           <div className="match-info-row">
             <span className="info-icon">👤</span>
             <span>Organiza: <strong>{match.creator_name}</strong></span>
+          </div>
+          <div className="match-info-row">
+            <span className="info-icon">👥</span>
+            <span><strong>Faltan {missingNeededPlayers} jugadores de {neededPlayers}</strong></span>
           </div>
           {match.description && (
              <div className="match-info-row" style={{ opacity: 0.7 }}>
@@ -270,12 +278,19 @@ export default function MatchDetail() {
 
       {activeTab === 'info' && (
         <div>
-          <h3>Jugadores ({players.length}/{match.max_players})</h3>
+          <h3>Jugadores · Faltan {missingNeededPlayers} jugadores de {neededPlayers}</h3>
           {players.length > 0 ? (
             <ul className="match-players-list">
               {players.map(p => (
                 <li key={p.user_id} className="card match-player-item">
-                  <strong>{p.profiles?.name || 'Jugador'}</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                    <strong>{p.profiles?.name || 'Jugador'}</strong>
+                    {isCreator && (
+                      <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/users/${p.user_id}`)}>
+                        Ver perfil
+                      </button>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

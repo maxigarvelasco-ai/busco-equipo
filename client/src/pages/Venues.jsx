@@ -58,16 +58,20 @@ export default function Venues() {
   const [canManageVenues, setCanManageVenues] = useState(false);
   const [loadingRoleAccess, setLoadingRoleAccess] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [bookingSlotId, setBookingSlotId] = useState('');
   const [createError, setCreateError] = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [form, setForm] = useState({
     name: '',
     address: '',
     phone: '',
+    description: '',
     inferred_city: '',
     football_types: [],
     services: [],
+    slots: [],
   });
+  const [slotDraft, setSlotDraft] = useState({ slot_time: '', price: '' });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [mapsReady, setMapsReady] = useState(false);
@@ -222,7 +226,8 @@ export default function Venues() {
         throw new Error('Seleccioná una dirección que incluya ciudad');
       }
       const created = await venuesAPI.create({ ...form, city: inferredCity, address: normalizedAddress || form.address.trim() });
-      setForm({ name: '', address: '', phone: '', inferred_city: '', football_types: [], services: [] });
+      setForm({ name: '', address: '', phone: '', description: '', inferred_city: '', football_types: [], services: [], slots: [] });
+      setSlotDraft({ slot_time: '', price: '' });
       setShowCreate(false);
       setCreateSuccess('Cancha guardada correctamente');
       if (created) {
@@ -238,8 +243,39 @@ export default function Venues() {
     }
   };
 
+  const handleBookSlot = async (slotId) => {
+    try {
+      setBookingSlotId(slotId);
+      await venuesAPI.bookSlot(slotId);
+      setCreateSuccess('Reserva realizada');
+      const data = await venuesAPI.getAll({});
+      setVenues(data);
+    } catch (err) {
+      setCreateError(err?.message || 'No se pudo reservar ese horario');
+    } finally {
+      setBookingSlotId('');
+    }
+  };
+
   const useDetectedLocation = () => {
     detectMyLocation();
+  };
+
+  const addSlot = () => {
+    const hhmm = String(slotDraft.slot_time || '').trim();
+    if (!hhmm) return;
+    setForm((prev) => ({
+      ...prev,
+      slots: [...(prev.slots || []), { slot_time: hhmm, price: slotDraft.price || '0' }],
+    }));
+    setSlotDraft({ slot_time: '', price: '' });
+  };
+
+  const removeSlot = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      slots: (prev.slots || []).filter((_, i) => i !== index),
+    }));
   };
 
   useEffect(() => {
@@ -342,12 +378,55 @@ export default function Venues() {
           <div className="form-group">
             <label className="form-label">Tipos de futbol</label>
             <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-              {['F5', 'F7', 'F11'].map((ft) => (
+              {['F5', 'F7', 'F9', 'F11'].map((ft) => (
                 <button key={ft} type="button" className={`btn btn-sm ${form.football_types.includes(ft) ? 'btn-primary' : 'btn-secondary'}`} onClick={() => toggleInArray('football_types', ft)}>
                   {ft}
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Descripción</label>
+            <textarea
+              className="form-textarea"
+              value={form.description}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              placeholder="Contá sobre la cancha, superficie, reglas, etc."
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Disponibilidad horaria y precio</label>
+            <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.45rem' }}>
+              <input
+                type="time"
+                className="form-input"
+                style={{ flex: 1, minWidth: 120 }}
+                value={slotDraft.slot_time}
+                onChange={(e) => setSlotDraft((p) => ({ ...p, slot_time: e.target.value }))}
+              />
+              <input
+                type="number"
+                className="form-input"
+                style={{ flex: 1, minWidth: 120 }}
+                placeholder="Precio"
+                min="0"
+                value={slotDraft.price}
+                onChange={(e) => setSlotDraft((p) => ({ ...p, price: e.target.value }))}
+              />
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addSlot}>Agregar horario</button>
+            </div>
+            {(form.slots || []).length > 0 && (
+              <div style={{ display: 'grid', gap: '0.35rem' }}>
+                {form.slots.map((slot, idx) => (
+                  <div key={`${slot.slot_time}-${idx}`} className="match-info-row" style={{ justifyContent: 'space-between' }}>
+                    <span>{slot.slot_time} · ${Number(slot.price || 0).toLocaleString('es-AR')}</span>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => removeSlot(idx)}>Quitar</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -438,6 +517,12 @@ export default function Venues() {
                     <span>{venue.phone}</span>
                   </div>
                 )}
+                {venue.description && (
+                  <div className="match-info-row">
+                    <span className="info-icon">📝</span>
+                    <span>{venue.description}</span>
+                  </div>
+                )}
                 {(venue.services && venue.services.length > 0) && (
                   <div className="match-info-row">
                     <span className="info-icon">🧰</span>
@@ -454,9 +539,17 @@ export default function Venues() {
                   </div>
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {venue.venue_slots.map(slot => (
-                      <span key={slot.id} className={`badge ${slot.is_booked || slot.status === 'booked' ? 'badge-full' : 'badge-type'}`} style={{ fontSize: '0.7rem' }}>
-                        {slot.slot_time?.slice(0, 5)} {slot.is_booked || slot.status === 'booked' ? 'reservado' : 'disponible'}
-                      </span>
+                      <button
+                        key={slot.id}
+                        type="button"
+                        className={`badge ${slot.is_booked || slot.status === 'booked' ? 'badge-full' : 'badge-type'}`}
+                        style={{ fontSize: '0.7rem', border: 'none', cursor: slot.is_booked || slot.status === 'booked' ? 'default' : 'pointer' }}
+                        disabled={slot.is_booked || slot.status === 'booked' || bookingSlotId === slot.id}
+                        onClick={() => handleBookSlot(slot.id)}
+                        title={slot.is_booked || slot.status === 'booked' ? 'Reservado' : 'Reservar horario'}
+                      >
+                        {slot.slot_time?.slice(0, 5)} · ${Number(slot.price || 0).toLocaleString('es-AR')} · {slot.is_booked || slot.status === 'booked' ? 'reservado' : (bookingSlotId === slot.id ? 'reservando...' : 'disponible')}
+                      </button>
                     ))}
                   </div>
                 </div>

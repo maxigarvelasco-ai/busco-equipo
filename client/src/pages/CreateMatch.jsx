@@ -60,7 +60,7 @@ export default function CreateMatch() {
     { key: 'futsal', label: 'Futsal', value: 5 },
     { key: 'f5', label: 'F5', value: 5 },
     { key: 'f7', label: 'F7', value: 7 },
-    { key: 'f8', label: 'F8', value: 8 },
+    { key: 'f9', label: 'F9', value: 9 },
     { key: 'f11', label: 'F11', value: 11 },
   ];
   const selectedFootball = FOOTBALL_OPTIONS.find((o) => o.key === footballMode) || FOOTBALL_OPTIONS[1];

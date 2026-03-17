@@ -14,22 +14,23 @@ alter table if exists public.profiles
   add column if not exists club_city text,
   add column if not exists club_zone text,
   add column if not exists club_phone text,
+  add column if not exists club_contact_visible boolean not null default false,
   add column if not exists venue_name text,
   add column if not exists venue_bio text,
   add column if not exists venue_city text,
   add column if not exists venue_zone text,
   add column if not exists venue_phone text;
 
--- 2) Matches/Tournaments football types: include F8.
+-- 2) Matches/Tournaments football types: include F9.
 alter table if exists public.matches
   drop constraint if exists matches_football_type_check;
 alter table if exists public.matches
-  add constraint matches_football_type_check check (football_type in (5, 7, 8, 11));
+  add constraint matches_football_type_check check (football_type in (5, 7, 9, 11));
 
 alter table if exists public.tournaments
   drop constraint if exists tournaments_football_type_check;
 alter table if exists public.tournaments
-  add constraint tournaments_football_type_check check (football_type in (5, 7, 8, 11));
+  add constraint tournaments_football_type_check check (football_type in (5, 7, 9, 11));
 
 -- 3) Clubs table normalization (works if table already existed with old schema).
 create table if not exists public.clubs (
@@ -153,7 +154,7 @@ alter table if exists public.club_recruitments
 alter table if exists public.club_recruitments
   drop constraint if exists club_recruitments_football_type_check;
 alter table if exists public.club_recruitments
-  add constraint club_recruitments_football_type_check check (football_type in (5, 7, 8, 11) or football_type is null);
+  add constraint club_recruitments_football_type_check check (football_type in (5, 7, 9, 11) or football_type is null);
 
 create index if not exists club_recruitments_club_id_idx on public.club_recruitments(club_id);
 create index if not exists club_recruitments_status_created_idx on public.club_recruitments(status, created_at desc);

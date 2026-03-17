@@ -595,6 +595,7 @@ export const venuesAPI = {
       city: venueData.city || null,
       zone: venueData.zone || venueData.address || venueData.city || null,
       phone: venuePhone,
+      description: venueData.description || null,
       football_types: venueData.football_types || [],
       services: venueData.services || [],
       amenities: venueData.services || [],
@@ -610,11 +611,49 @@ export const venuesAPI = {
         address: venueData.address || null,
         city: venueData.city || null,
         zone: venueData.zone || venueData.address || venueData.city || null,
+        description: venueData.description || null,
       };
       ({ data, error } = await supabase.from('venues').insert(minimalPayload).select().single());
       if (error) throw error;
     }
+
+    const slots = Array.isArray(venueData.slots) ? venueData.slots : [];
+    if (data?.id && slots.length > 0) {
+      const slotRows = slots
+        .filter((s) => String(s?.slot_time || '').trim())
+        .map((s) => ({
+          venue_id: data.id,
+          slot_time: String(s.slot_time).trim(),
+          price: s.price != null && String(s.price) !== '' ? Number(s.price) : 0,
+          status: 'available',
+        }));
+      if (slotRows.length > 0) {
+        await supabase.from('venue_slots').insert(slotRows);
+      }
+    }
+
     return data;
+  },
+
+  async bookSlot(slotId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data: slot, error: readErr } = await supabase
+      .from('venue_slots')
+      .select('id, status, is_booked')
+      .eq('id', slotId)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    if (!slot?.id) throw new Error('Horario no encontrado');
+    if (slot.is_booked || slot.status === 'booked') throw new Error('Ese horario ya está reservado');
+
+    const { error } = await supabase
+      .from('venue_slots')
+      .update({ status: 'booked', is_booked: true })
+      .eq('id', slotId)
+      .or('is_booked.is.false,is_booked.is.null');
+    if (error) throw error;
   },
 };
 
@@ -1143,7 +1182,7 @@ export const clubsAPI = {
     if (creatorIds.length > 0) {
       const { data: profiles, error: pErr } = await supabase
         .from('profiles')
-        .select('id, name, city, zone, phone')
+        .select('id, name, city, zone, phone, club_contact_visible')
         .in('id', creatorIds);
       if (pErr) throw pErr;
       profileMap = (profiles || []).reduce((acc, p) => ({ ...acc, [p.id]: p }), {});
@@ -1157,7 +1196,7 @@ export const clubsAPI = {
           ...(r.clubs || {}),
           phone: r?.clubs?.phone || ownerProfile?.phone || null,
           address: r?.clubs?.address || [ownerProfile?.city, ownerProfile?.zone].filter(Boolean).join(' - ') || null,
-          contact_name: ownerProfile?.name || null,
+          contact_name: ownerProfile?.club_contact_visible ? (ownerProfile?.name || null) : null,
         },
       };
     });
@@ -1165,6 +1204,30 @@ export const clubsAPI = {
 
   async createRecruitment(recruitmentData) {
     const { error } = await supabase.from('club_recruitments').insert(recruitmentData);
+    if (error) throw error;
+  },
+
+  async deleteRecruitment(recruitmentId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Debes iniciar sesión');
+
+    const { data: item, error: readErr } = await supabase
+      .from('club_recruitments')
+      .select('id, club_id, clubs:club_id(creator_id)')
+      .eq('id', recruitmentId)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    if (!item?.id) throw new Error('La petición no existe');
+
+    const ownerId = item?.clubs?.creator_id;
+    if (!ownerId || String(ownerId) !== String(session.user.id)) {
+      throw new Error('No tenés permisos para eliminar esta petición');
+    }
+
+    const { error } = await supabase
+      .from('club_recruitments')
+      .delete()
+      .eq('id', recruitmentId);
     if (error) throw error;
   },
 

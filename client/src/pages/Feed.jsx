@@ -8,7 +8,7 @@ const FOOTBALL_TYPES = [
   { key: 'futsal', label: 'Futsal', value: 5 },
   { key: '5', label: 'F5', value: 5 },
   { key: '7', label: 'F7', value: 7 },
-  { key: '8', label: 'F8', value: 8 },
+  { key: '9', label: 'F9', value: 9 },
   { key: '11', label: 'F11', value: 11 },
 ];
 const REQUEST_TYPES = ['Todas', 'Match', 'Tournament', 'Club'];
@@ -146,6 +146,13 @@ export default function Feed() {
   const [toast, setToast] = useState(null);
   const [coords, setCoords] = useState(null);
 
+  const buildNeedLabel = (joined, needed) => {
+    const joinedNum = Math.max(Number(joined || 0), 0);
+    const neededNum = Math.max(Number(needed || 0), 0);
+    const missing = Math.max(neededNum - joinedNum, 0);
+    return `Faltan ${missing} jugadores de ${neededNum}`;
+  };
+
   const loadMatches = useCallback(async (showSpinner = false) => {
     try {
       if (showSpinner) setIsLoading(true);
@@ -256,6 +263,17 @@ export default function Feed() {
     }
   };
 
+  const handleDeleteClubRecruitment = async (recruitmentId) => {
+    if (!confirm('Seguro queres eliminar esta búsqueda de jugadores del club?')) return;
+    try {
+      await clubsAPI.deleteRecruitment(recruitmentId);
+      showToast('Petición de club eliminada');
+      loadMatches(false);
+    } catch (err) {
+      showToast(err.message || 'No se pudo eliminar la petición', 'error');
+    }
+  };
+
   const normalizeRequests = () => {
     const matchRows = (matches || []).map((m) => {
       const lat = m.latitude != null ? Number(m.latitude) : null;
@@ -276,6 +294,8 @@ export default function Feed() {
         time: m.match_time,
         joined: m.players_joined ?? m.current_players ?? 0,
         total: m.max_players,
+        needed_players: Math.max((m.max_players || 1) - 1, 1),
+        joined_needed_players: Math.max((m.players_joined ?? m.current_players ?? 0) - 1, 0),
         organizer_name: m.creator_name || 'Anónimo',
         organizer_id: m.owner_id ?? m.creator_id ?? null,
         raw: m,
@@ -285,6 +305,7 @@ export default function Feed() {
         min_age: m.min_age ?? null,
         max_age: m.max_age ?? null,
         goalkeepers_needed: m.goalkeepers_needed ?? 0,
+        description: m.description || null,
       };
     });
 
@@ -309,6 +330,8 @@ export default function Feed() {
       max_age: t.max_age ?? null,
       goalkeepers_needed: null,
       needed_players: t.needed_players ?? 1,
+      joined_needed_players: 0,
+      description: t.description || null,
     }));
 
     const clubRows = (clubRecruitments || []).map((c) => ({
@@ -333,11 +356,13 @@ export default function Feed() {
       max_age: null,
       goalkeepers_needed: null,
       needed_players: c.needed_players ?? 1,
+      joined_needed_players: 0,
       position_needed: c.position_needed || null,
       category: c.category || null,
       club_address: c.clubs?.address || null,
       club_phone: c.clubs?.phone || null,
       club_contact_name: c.clubs?.contact_name || null,
+      description: c.description || c.clubs?.description || null,
     }));
 
     let merged = [...matchRows, ...tournamentRows, ...clubRows];
@@ -492,9 +517,7 @@ export default function Feed() {
               {req.kind === 'Match' ? (
                 <div className="match-info-row">
                   <span className="info-icon">👥</span>
-                  <span>
-                    {req.joined} / {req.total} jugadores{req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
-                  </span>
+                  <span>{buildNeedLabel(req.joined_needed_players, req.needed_players)}{req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}</span>
                 </div>
               ) : req.kind === 'Club' ? (
                 <>
@@ -522,13 +545,19 @@ export default function Feed() {
                   )}
                   <div className="match-info-row">
                     <span className="info-icon">👥</span>
-                    <span>Necesitan {req.needed_players} jugador{req.needed_players === 1 ? '' : 'es'}{req.category ? ` · ${req.category}` : ''}</span>
+                    <span>{buildNeedLabel(req.joined_needed_players, req.needed_players)}{req.category ? ` · ${req.category}` : ''}</span>
                   </div>
                 </>
               ) : (
                 <div className="match-info-row">
                   <span className="info-icon">👥</span>
-                  <span>Buscan {req.needed_players} jugadores</span>
+                  <span>{buildNeedLabel(req.joined_needed_players, req.needed_players)}</span>
+                </div>
+              )}
+              {req.description && (
+                <div className="match-info-row">
+                  <span className="info-icon">💬</span>
+                  <span>{req.description}</span>
                 </div>
               )}
               {req.kind === 'Match' && req.distanceKm != null && (
@@ -591,17 +620,24 @@ export default function Feed() {
                   Postularse
                 </button>
               ) : (
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (req.organizer_id) {
-                      navigate(`/users/${req.organizer_id}`);
-                    }
-                  }}
-                >
-                  Ver club
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (req.organizer_id) {
+                        navigate(`/users/${req.organizer_id}`);
+                      }
+                    }}
+                  >
+                    Ver club
+                  </button>
+                  {user?.id && req.raw?.clubs?.creator_id && String(user.id) === String(req.raw.clubs.creator_id) && (
+                    <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleDeleteClubRecruitment(req.id); }}>
+                      Eliminar petición
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
