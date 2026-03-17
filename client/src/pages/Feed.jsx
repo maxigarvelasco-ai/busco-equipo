@@ -343,7 +343,7 @@ export default function Feed() {
                 <div className="match-info-row">
                   <span className="info-icon">👥</span>
                   <span>
-                    {req.joined} / {req.total} jugadores{req.goalkeepers_needed ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
+                    {req.joined} / {req.total} jugadores{req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
                   </span>
                 </div>
               ) : (

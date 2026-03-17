@@ -11,6 +11,8 @@ export default function CreateMatch() {
   const [footballType, setFootballType] = useState('5');
   const [matchForm, setMatchForm] = useState({
     venue: '',
+    inferred_city: '',
+    inferred_place_id: '',
     date: new Date().toISOString().split('T')[0],
     time: '21:00',
     needed_players: '3',
@@ -18,12 +20,14 @@ export default function CreateMatch() {
     age_restricted: false,
     min_age: '18',
     max_age: '25',
-    goalkeepers_needed: '1',
+    goalkeepers_needed: '0',
     description: '',
   });
   const [tournamentForm, setTournamentForm] = useState({
     name: '',
     venue: '',
+    inferred_city: '',
+    inferred_place_id: '',
     start_date: new Date().toISOString().split('T')[0],
     needed_players: '2',
     match_gender: 'mixto',
@@ -71,16 +75,22 @@ export default function CreateMatch() {
     return (
       byType('locality')
       || byType('postal_town')
+      || byType('administrative_area_level_3')
       || byType('administrative_area_level_2')
       || byType('administrative_area_level_1')
+      || byType('sublocality')
+      || byType('neighborhood')
+      || byType('country')
       || ''
     );
   };
 
-  const resolveAddressMeta = async (addressText) => {
+  const resolveAddressMeta = async (addressText, placeId = null) => {
     const query = (addressText || '').trim();
     if (!query) return { city: '', address: '', latitude: null, longitude: null };
-    const results = await geocode({ address: query, language: 'es' });
+    const results = placeId
+      ? await geocode({ placeId, language: 'es' })
+      : await geocode({ address: query, language: 'es' });
     const first = results?.[0];
     if (!first) return { city: '', address: query, latitude: null, longitude: null };
     return {
@@ -167,11 +177,17 @@ export default function CreateMatch() {
       if (cancelled) return;
       const normalizedQuery = query.toLowerCase();
       const labels = [...geoPredictions, ...regionPredictions].map((p) => p.description).filter(Boolean);
-      const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
-      const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
-      const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
+      const merged = [...geoPredictions, ...regionPredictions]
+        .filter((p) => p?.description)
+        .filter((p, idx, arr) => arr.findIndex((x) => x.place_id === p.place_id) === idx);
+      const startsWith = merged.filter((p) => p.description.toLowerCase().startsWith(normalizedQuery));
+      const fallback = merged.filter((p) => p.description.toLowerCase().includes(normalizedQuery));
+      const top = (startsWith.length ? startsWith : fallback).slice(0, 8);
 
-      setAddressSuggestions(names);
+      setAddressSuggestions(top.map((p) => ({
+        label: p.description,
+        placeId: p.place_id,
+      })));
       setShowAddressSuggestions(true);
     }, 260);
 
@@ -204,10 +220,7 @@ export default function CreateMatch() {
           throw new Error('El rango de edad no es válido');
         }
         const resolved = await resolveAddressMeta(matchForm.venue);
-        const inferredCity = resolved.city;
-        if (!inferredCity) {
-          throw new Error('Seleccioná una dirección que incluya ciudad');
-        }
+        const inferredCity = matchForm.inferred_city || resolved.city || 'Sin ciudad';
         await matchesAPI.create({
           football_type: parseInt(footballType),
           title: `Partido F${footballType}`,
@@ -223,7 +236,7 @@ export default function CreateMatch() {
           age_restricted: !!matchForm.age_restricted,
           min_age: matchForm.age_restricted ? parseInt(matchForm.min_age || '0') : null,
           max_age: matchForm.age_restricted ? parseInt(matchForm.max_age || '0') : null,
-          goalkeepers_needed: parseInt(matchForm.goalkeepers_needed || '1'),
+          goalkeepers_needed: parseInt(matchForm.goalkeepers_needed || '0'),
           match_kind: 'recreativo',
           visibility: 'public',
           requires_approval: true,
@@ -245,7 +258,7 @@ export default function CreateMatch() {
           start_date: tournamentForm.start_date,
           max_teams: 2,
           entry_price: 0,
-          city: tournamentResolved.city || null,
+          city: tournamentForm.inferred_city || tournamentResolved.city || null,
           venue_name: tournamentResolved.address || tournamentForm.venue || null,
           match_gender: tournamentForm.match_gender,
           age_restricted: !!tournamentForm.age_restricted,
@@ -320,20 +333,28 @@ export default function CreateMatch() {
                 value={matchForm.venue}
                 onFocus={() => setShowAddressSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 120)}
-                onChange={(e) => setMatchForm((p) => ({ ...p, venue: e.target.value }))}
+                onChange={(e) => setMatchForm((p) => ({ ...p, venue: e.target.value, inferred_city: '', inferred_place_id: '' }))}
                 required
               />
               {showAddressSuggestions && addressSuggestions.length > 0 && (
                 <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
-                  {addressSuggestions.map((address) => (
+                  {addressSuggestions.map((s) => (
                     <button
-                      key={address}
+                      key={s.placeId || s.label}
                       type="button"
                       className="btn btn-secondary btn-sm"
                       style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                      onMouseDown={() => setMatchForm((p) => ({ ...p, venue: address }))}
+                      onMouseDown={async () => {
+                        const meta = await resolveAddressMeta(s.label, s.placeId);
+                        setMatchForm((p) => ({
+                          ...p,
+                          venue: meta.address || s.label,
+                          inferred_city: meta.city || '',
+                          inferred_place_id: s.placeId || '',
+                        }));
+                      }}
                     >
-                      {address}
+                      {s.label}
                     </button>
                   ))}
                 </div>
@@ -365,6 +386,7 @@ export default function CreateMatch() {
               <div className="form-group">
                 <label className="form-label">Arqueros necesarios</label>
                 <select className="form-select" value={matchForm.goalkeepers_needed} onChange={(e) => setMatchForm((p) => ({ ...p, goalkeepers_needed: e.target.value }))}>
+                  <option value="0">Sin arqueros</option>
                   <option value="1">1 arquero</option>
                   <option value="2">2 arqueros</option>
                 </select>
@@ -414,19 +436,27 @@ export default function CreateMatch() {
                 value={tournamentForm.venue}
                 onFocus={() => setShowAddressSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 120)}
-                onChange={(e) => setTournamentForm((p) => ({ ...p, venue: e.target.value }))}
+                onChange={(e) => setTournamentForm((p) => ({ ...p, venue: e.target.value, inferred_city: '', inferred_place_id: '' }))}
               />
               {showAddressSuggestions && addressSuggestions.length > 0 && (
                 <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
-                  {addressSuggestions.map((address) => (
+                  {addressSuggestions.map((s) => (
                     <button
-                      key={address}
+                      key={s.placeId || s.label}
                       type="button"
                       className="btn btn-secondary btn-sm"
                       style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                      onMouseDown={() => setTournamentForm((p) => ({ ...p, venue: address }))}
+                      onMouseDown={async () => {
+                        const meta = await resolveAddressMeta(s.label, s.placeId);
+                        setTournamentForm((p) => ({
+                          ...p,
+                          venue: meta.address || s.label,
+                          inferred_city: meta.city || '',
+                          inferred_place_id: s.placeId || '',
+                        }));
+                      }}
                     >
-                      {address}
+                      {s.label}
                     </button>
                   ))}
                 </div>

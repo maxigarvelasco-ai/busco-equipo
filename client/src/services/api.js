@@ -126,7 +126,7 @@ export const matchesAPI = {
       age_restricted: !!matchData.age_restricted,
       min_age: matchData.age_restricted ? (matchData.min_age ?? null) : null,
       max_age: matchData.age_restricted ? (matchData.max_age ?? null) : null,
-      goalkeepers_needed: matchData.goalkeepers_needed ? parseInt(matchData.goalkeepers_needed) : 1,
+      goalkeepers_needed: matchData.goalkeepers_needed != null ? parseInt(matchData.goalkeepers_needed) : 0,
       description: matchData.description || null,
     };
 
