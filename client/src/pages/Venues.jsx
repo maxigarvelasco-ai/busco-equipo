@@ -16,12 +16,9 @@ export default function Venues() {
   const [form, setForm] = useState({
     name: '',
     address: '',
-    city: '',
     football_types: [],
     services: [],
   });
-  const [citySuggestions, setCitySuggestions] = useState([]);
-  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
 
@@ -64,8 +61,12 @@ export default function Venues() {
     e.preventDefault();
     try {
       setCreating(true);
-      await venuesAPI.create(form);
-      setForm({ name: '', address: '', city: '', football_types: [], services: [] });
+      const inferredCity = extractCityFromAddress(form.address);
+      if (!inferredCity) {
+        throw new Error('Seleccioná una dirección que incluya ciudad');
+      }
+      await venuesAPI.create({ ...form, city: inferredCity });
+      setForm({ name: '', address: '', football_types: [], services: [] });
       setShowCreate(false);
       const data = await venuesAPI.getAll({});
       setVenues(data);
@@ -76,55 +77,13 @@ export default function Venues() {
     }
   };
 
-  useEffect(() => {
-    const query = (form.city || '').trim();
-    if (query.length < 1) {
-      setCitySuggestions([]);
-      return;
-    }
-
-    let cancelled = false;
-    const timeoutId = setTimeout(async () => {
-      const service = getPlacesAutocompleteService();
-      if (!service) {
-        if (!cancelled) setCitySuggestions([]);
-        return;
-      }
-
-      const predictions = await new Promise((resolve) => {
-        service.getPlacePredictions(
-          {
-            input: query,
-            types: ['(cities)'],
-            componentRestrictions: { country: 'ar' },
-            language: 'es',
-          },
-          (result, status) => {
-            const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
-            resolve(ok ? (result || []) : []);
-          }
-        );
-      });
-
-      if (cancelled) return;
-      const normalizedQuery = query.toLowerCase();
-      const labels = predictions
-        .map((p) => p.description)
-        .filter(Boolean);
-
-      const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
-      const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
-      const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
-
-      setCitySuggestions(names);
-      setShowCitySuggestions(true);
-    }, 260);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-    };
-  }, [form.city]);
+  const extractCityFromAddress = (address) => {
+    const parts = (address || '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return parts.length >= 2 ? parts[1] : '';
+  };
 
   useEffect(() => {
     const query = (form.address || '').trim();
@@ -217,32 +176,6 @@ export default function Venues() {
                     onMouseDown={() => setForm((p) => ({ ...p, address }))}
                   >
                     {address}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="form-label">Ciudad</label>
-            <input
-              className="form-input"
-              value={form.city}
-              onFocus={() => setShowCitySuggestions(true)}
-              onBlur={() => setTimeout(() => setShowCitySuggestions(false), 120)}
-              onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
-              required
-            />
-            {showCitySuggestions && citySuggestions.length > 0 && (
-              <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
-                {citySuggestions.map((city) => (
-                  <button
-                    key={city}
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                    onMouseDown={() => setForm((p) => ({ ...p, city }))}
-                  >
-                    {city}
                   </button>
                 ))}
               </div>

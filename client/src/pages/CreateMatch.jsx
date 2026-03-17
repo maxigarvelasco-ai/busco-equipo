@@ -10,7 +10,6 @@ export default function CreateMatch() {
   const [requestType, setRequestType] = useState('casual_match');
   const [footballType, setFootballType] = useState('5');
   const [matchForm, setMatchForm] = useState({
-    city: '',
     venue: '',
     date: new Date().toISOString().split('T')[0],
     time: '21:00',
@@ -20,17 +19,12 @@ export default function CreateMatch() {
   const [tournamentForm, setTournamentForm] = useState({
     name: '',
     venue: '',
-    city: '',
     start_date: new Date().toISOString().split('T')[0],
     needed_players: '2',
     description: '',
   });
-  const [citySuggestions, setCitySuggestions] = useState([]);
-  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
-
-  const currentCityQuery = requestType === 'casual_match' ? matchForm.city : tournamentForm.city;
   const currentAddressQuery = requestType === 'casual_match' ? matchForm.venue : tournamentForm.venue;
 
   const getPlacesAutocompleteService = () => {
@@ -40,54 +34,6 @@ export default function CreateMatch() {
     }
     return window.__buscoEquipoPlacesService;
   };
-
-  useEffect(() => {
-    const query = (currentCityQuery || '').trim();
-    if (query.length < 1) {
-      setCitySuggestions([]);
-      return;
-    }
-
-    let cancelled = false;
-    const timeoutId = setTimeout(async () => {
-      const service = getPlacesAutocompleteService();
-      if (!service) {
-        if (!cancelled) setCitySuggestions([]);
-        return;
-      }
-
-      const predictions = await new Promise((resolve) => {
-        service.getPlacePredictions(
-          {
-            input: query,
-            types: ['(cities)'],
-            componentRestrictions: { country: 'ar' },
-            language: 'es',
-          },
-          (result, status) => {
-            const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
-            resolve(ok ? (result || []) : []);
-          }
-        );
-      });
-
-      if (cancelled) return;
-      const normalizedQuery = query.toLowerCase();
-      const labels = predictions.map((p) => p.description).filter(Boolean);
-
-      const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
-      const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
-      const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
-
-      setCitySuggestions(names);
-      setShowCitySuggestions(true);
-    }, 260);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeoutId);
-    };
-  }, [currentCityQuery]);
 
   useEffect(() => {
     const query = (currentAddressQuery || '').trim();
@@ -136,6 +82,14 @@ export default function CreateMatch() {
     };
   }, [currentAddressQuery]);
 
+  const extractCityFromAddress = (address) => {
+    const parts = (address || '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return parts.length >= 2 ? parts[1] : '';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -143,15 +97,19 @@ export default function CreateMatch() {
     setLoading(true);
     try {
       if (requestType === 'casual_match') {
-        if (!matchForm.city.trim()) {
-          throw new Error('Completá la ciudad');
+        if (!matchForm.venue.trim()) {
+          throw new Error('Completá la dirección');
+        }
+        const inferredCity = extractCityFromAddress(matchForm.venue);
+        if (!inferredCity) {
+          throw new Error('Seleccioná una dirección que incluya ciudad');
         }
         await matchesAPI.create({
           football_type: parseInt(footballType),
           title: `Partido F${footballType}`,
-          city: matchForm.city,
-          address: matchForm.venue || null,
-          zone: matchForm.city,
+          city: inferredCity,
+          address: matchForm.venue,
+          zone: inferredCity,
           match_date: matchForm.date,
           match_time: matchForm.time,
           max_players: Math.max(parseInt(matchForm.needed_players || '1') + 1, 2),
@@ -172,7 +130,7 @@ export default function CreateMatch() {
           start_date: tournamentForm.start_date,
           max_teams: 2,
           entry_price: 0,
-          city: tournamentForm.city || null,
+          city: extractCityFromAddress(tournamentForm.venue) || null,
           venue_name: tournamentForm.venue || null,
           needed_players: parseInt(tournamentForm.needed_players || '1'),
           description: tournamentForm.description || null,
@@ -229,39 +187,14 @@ export default function CreateMatch() {
         {requestType === 'casual_match' ? (
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="form-group">
-              <label className="form-label">Ciudad</label>
-              <input
-                className="form-input"
-                value={matchForm.city}
-                onFocus={() => setShowCitySuggestions(true)}
-                onBlur={() => setTimeout(() => setShowCitySuggestions(false), 120)}
-                onChange={(e) => setMatchForm((p) => ({ ...p, city: e.target.value }))}
-                required
-              />
-              {showCitySuggestions && citySuggestions.length > 0 && (
-                <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
-                  {citySuggestions.map((city) => (
-                    <button
-                      key={city}
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                      onMouseDown={() => setMatchForm((p) => ({ ...p, city }))}
-                    >
-                      {city}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Cancha (opcional)</label>
+              <label className="form-label">Dirección</label>
               <input
                 className="form-input"
                 value={matchForm.venue}
                 onFocus={() => setShowAddressSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 120)}
                 onChange={(e) => setMatchForm((p) => ({ ...p, venue: e.target.value }))}
+                required
               />
               {showAddressSuggestions && addressSuggestions.length > 0 && (
                 <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
@@ -305,7 +238,7 @@ export default function CreateMatch() {
               <input className="form-input" value={tournamentForm.name} onChange={(e) => setTournamentForm((p) => ({ ...p, name: e.target.value }))} required />
             </div>
             <div className="form-group">
-              <label className="form-label">Cancha o complejo</label>
+              <label className="form-label">Dirección o complejo</label>
               <input
                 className="form-input"
                 value={tournamentForm.venue}
@@ -324,31 +257,6 @@ export default function CreateMatch() {
                       onMouseDown={() => setTournamentForm((p) => ({ ...p, venue: address }))}
                     >
                       {address}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Ciudad</label>
-              <input
-                className="form-input"
-                value={tournamentForm.city}
-                onFocus={() => setShowCitySuggestions(true)}
-                onBlur={() => setTimeout(() => setShowCitySuggestions(false), 120)}
-                onChange={(e) => setTournamentForm((p) => ({ ...p, city: e.target.value }))}
-              />
-              {showCitySuggestions && citySuggestions.length > 0 && (
-                <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
-                  {citySuggestions.map((city) => (
-                    <button
-                      key={city}
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                      onMouseDown={() => setTournamentForm((p) => ({ ...p, city }))}
-                    >
-                      {city}
                     </button>
                   ))}
                 </div>
