@@ -7,6 +7,40 @@ const SUGGESTED_VENUES = [
   { id: 's3', name: 'Complejo Sur', zone: 'Echesortu', city: 'Rosario', football: 'F5', amenities: ['techado', 'iluminacion', 'kiosco'] },
 ];
 
+function countryAbbrFromText(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  if (/^[A-Z]{2}$/.test(text)) return text;
+  const map = {
+    argentina: 'AR',
+    uruguay: 'UY',
+    paraguay: 'PY',
+    chile: 'CL',
+    bolivia: 'BO',
+    brasil: 'BR',
+    brazil: 'BR',
+  };
+  const key = text.toLowerCase();
+  if (map[key]) return map[key];
+  return text.slice(0, 2).toUpperCase();
+}
+
+function formatLocation(address, city, zone) {
+  const addressText = String(address || '').trim();
+  const cityText = String(city || '').trim();
+  const zoneText = String(zone || '').trim();
+  const parts = addressText ? addressText.split(',').map((p) => p.trim()).filter(Boolean) : [];
+  const street = parts[0] || zoneText || cityText || 'Sin ubicacion';
+  const countryRaw = parts.length > 1 ? parts[parts.length - 1] : '';
+  const country = countryAbbrFromText(countryRaw);
+  const finalCity = cityText || (parts.length > 1 ? parts.find((p) => p !== street && p !== countryRaw) || '' : '');
+
+  const compact = [street];
+  if (finalCity && finalCity.toLowerCase() !== street.toLowerCase()) compact.push(finalCity);
+  if (country && country.toLowerCase() !== finalCity.toLowerCase()) compact.push(country);
+  return compact.filter(Boolean).join(', ');
+}
+
 export default function Venues() {
   const { user, profile } = useAuth();
   const [venues, setVenues] = useState([]);
@@ -318,7 +352,7 @@ export default function Venues() {
               <div className="match-info">
                 <div className="match-info-row">
                   <span className="info-icon">📍</span>
-                  <span>{venue.address || venue.zone} - <strong>{venue.city || venue.zone}</strong></span>
+                  <span><strong>{formatLocation(venue.address, venue.city, venue.zone)}</strong></span>
                 </div>
                 {(venue.football_types && venue.football_types.length > 0) && (
                   <div className="match-info-row">

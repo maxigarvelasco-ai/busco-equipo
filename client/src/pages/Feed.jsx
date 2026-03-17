@@ -36,6 +36,66 @@ function formatWhen(date, time) {
   return hhmm ? `${baseDate.toLocaleDateString('es-AR')} ${hhmm}` : baseDate.toLocaleDateString('es-AR');
 }
 
+function countryAbbrFromText(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  if (/^[A-Z]{2}$/.test(text)) return text;
+
+  const map = {
+    argentina: 'AR',
+    uruguay: 'UY',
+    paraguay: 'PY',
+    chile: 'CL',
+    bolivia: 'BO',
+    brasil: 'BR',
+    brazil: 'BR',
+    peru: 'PE',
+    ecuador: 'EC',
+    colombia: 'CO',
+    venezuela: 'VE',
+    mexico: 'MX',
+    'estados unidos': 'US',
+    'united states': 'US',
+    espana: 'ES',
+    spain: 'ES',
+    italia: 'IT',
+    italy: 'IT',
+    francia: 'FR',
+    france: 'FR',
+    portugal: 'PT',
+    alemania: 'DE',
+    germany: 'DE',
+    'reino unido': 'GB',
+    'united kingdom': 'GB',
+  };
+  const key = text.toLowerCase();
+  if (map[key]) return map[key];
+  return text.slice(0, 2).toUpperCase();
+}
+
+function formatLocation(address, city, zone) {
+  const addressText = String(address || '').trim();
+  const zoneText = String(zone || '').trim();
+  const cityText = String(city || '').trim();
+
+  const parts = addressText
+    ? addressText.split(',').map((p) => p.trim()).filter(Boolean)
+    : [];
+
+  const street = parts[0] || zoneText || cityText || 'Sin ubicacion';
+  const countryRaw = parts.length > 1 ? parts[parts.length - 1] : '';
+  const country = countryAbbrFromText(countryRaw);
+
+  const finalCity = cityText && cityText !== 'Sin ciudad'
+    ? cityText
+    : (parts.length > 1 ? parts.find((p) => p !== street && p !== countryRaw) || '' : '');
+
+  const compact = [street];
+  if (finalCity && finalCity.toLowerCase() !== street.toLowerCase()) compact.push(finalCity);
+  if (country && country.toLowerCase() !== finalCity.toLowerCase()) compact.push(country);
+  return compact.filter(Boolean).join(', ');
+}
+
 function matchesProfileRestrictions(item, profile) {
   if (!item) return true;
   const requiredGender = item.match_gender || 'mixto';
@@ -185,8 +245,10 @@ export default function Feed() {
         kind: 'Match',
         id: m.id,
         football_type: m.football_type,
-        address: m.address || m.zone || '',
+        address: m.address || '',
         city: m.city && m.city !== 'Sin ciudad' ? m.city : '',
+        zone: m.zone || '',
+        locationLabel: formatLocation(m.address || '', m.city || '', m.zone || ''),
         date: m.match_date,
         time: m.match_time,
         joined: m.players_joined ?? m.current_players ?? 0,
@@ -208,6 +270,8 @@ export default function Feed() {
       football_type: t.football_type,
       address: t.venue_name || '',
       city: (t.city && t.city !== 'Sin ciudad' ? t.city : '') || t.zone || '',
+      zone: t.zone || '',
+      locationLabel: formatLocation(t.venue_name || '', t.city || '', t.zone || ''),
       date: t.start_date,
       time: null,
       joined: null,
@@ -333,7 +397,7 @@ export default function Feed() {
             <div className="match-info">
               <div className="match-info-row">
                 <span className="info-icon">📍</span>
-                <span>{[req.address, req.city].filter(Boolean).join(' - ') || 'Sin ubicación'}</span>
+                <span>{req.locationLabel || 'Sin ubicacion'}</span>
               </div>
               <div className="match-info-row">
                 <span className="info-icon">🕒</span>

@@ -4,6 +4,53 @@ import { useAuth } from '../context/AuthContext';
 import { matchesAPI } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 
+function countryAbbrFromText(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return '';
+  if (/^[A-Z]{2}$/.test(text)) return text;
+
+  const map = {
+    argentina: 'AR',
+    uruguay: 'UY',
+    paraguay: 'PY',
+    chile: 'CL',
+    bolivia: 'BO',
+    brasil: 'BR',
+    brazil: 'BR',
+    peru: 'PE',
+    ecuador: 'EC',
+    colombia: 'CO',
+    venezuela: 'VE',
+    mexico: 'MX',
+    'estados unidos': 'US',
+    'united states': 'US',
+    espana: 'ES',
+    spain: 'ES',
+  };
+  const key = text.toLowerCase();
+  if (map[key]) return map[key];
+  return text.slice(0, 2).toUpperCase();
+}
+
+function formatLocation(address, city, zone) {
+  const addressText = String(address || '').trim();
+  const cityText = String(city || '').trim();
+  const zoneText = String(zone || '').trim();
+
+  const parts = addressText ? addressText.split(',').map((p) => p.trim()).filter(Boolean) : [];
+  const street = parts[0] || zoneText || cityText || 'Sin ubicacion';
+  const countryRaw = parts.length > 1 ? parts[parts.length - 1] : '';
+  const country = countryAbbrFromText(countryRaw);
+  const resolvedCity = cityText && cityText !== 'Sin ciudad'
+    ? cityText
+    : (parts.length > 1 ? parts.find((p) => p !== street && p !== countryRaw) || '' : '');
+
+  const compact = [street];
+  if (resolvedCity && resolvedCity.toLowerCase() !== street.toLowerCase()) compact.push(resolvedCity);
+  if (country && country.toLowerCase() !== resolvedCity.toLowerCase()) compact.push(country);
+  return compact.filter(Boolean).join(', ');
+}
+
 export default function MatchDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -160,15 +207,14 @@ export default function MatchDetail() {
 
   const ownerId = match.owner_id ?? match.creator_id ?? null;
   const isCreator = Boolean(user && ownerId && String(user.id) === String(ownerId));
+  const locationLabel = formatLocation(match.address, match.city, match.zone);
 
   return (
     <div className="page-content" style={{ paddingBottom: '80px' }}>
-      <div className="page-header" style={{ marginBottom: '1rem' }}>
+      <div className="page-header match-detail-header">
         <button className="btn btn-sm btn-secondary" onClick={() => navigate(-1)}>Volver</button>
-        <h1 className="page-title" style={{ marginTop: '0.5rem' }}>Detalle del Partido</h1>
-        {isCreator && (
-          <button className="btn btn-sm btn-danger" style={{ marginLeft: '1rem' }} onClick={handleDelete}>Eliminar partido</button>
-        )}
+        <h1 className="page-title">Detalle del Partido</h1>
+        {isCreator && <button className="btn btn-sm btn-danger" onClick={handleDelete}>Eliminar partido</button>}
       </div>
 
       <div className="card match-card" style={{ marginBottom: '1rem' }}>
@@ -182,7 +228,7 @@ export default function MatchDetail() {
         <div className="match-info">
           <div className="match-info-row">
             <span className="info-icon">📍</span>
-            <span><strong>{match.address ? match.address : match.zone}</strong></span>
+            <span><strong>{locationLabel}</strong></span>
           </div>
           <div className="match-info-row">
             <span className="info-icon">📅</span>
@@ -201,23 +247,23 @@ export default function MatchDetail() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '1px solid #ddd', paddingBottom: '0.5rem' }}>
+      <div className="match-detail-tabs">
         <button 
           onClick={() => setActiveTab('info')} 
-          style={{ padding: '0.5rem', border: 'none', background: 'none', borderBottom: activeTab === 'info' ? '2px solid var(--color-primary)' : 'none', fontWeight: activeTab === 'info' ? 'bold' : 'normal', cursor: 'pointer' }}>
+          className={`match-detail-tab ${activeTab === 'info' ? 'active' : ''}`}>
           Información
         </button>
         <button 
           onClick={() => setActiveTab('chat')} 
-          style={{ padding: '0.5rem', border: 'none', background: 'none', borderBottom: activeTab === 'chat' ? '2px solid var(--color-primary)' : 'none', fontWeight: activeTab === 'chat' ? 'bold' : 'normal', cursor: 'pointer' }}>
+          className={`match-detail-tab ${activeTab === 'chat' ? 'active' : ''}`}>
           Chat
         </button>
         {isCreator && (
           <button 
             onClick={() => setActiveTab('requests')} 
-            style={{ padding: '0.5rem', border: 'none', background: 'none', borderBottom: activeTab === 'requests' ? '2px solid var(--color-primary)' : 'none', fontWeight: activeTab === 'requests' ? 'bold' : 'normal', cursor: 'pointer', position: 'relative' }}>
+            className={`match-detail-tab ${activeTab === 'requests' ? 'active' : ''}`}>
             Solicitudes
-            {joinRequests.length > 0 && <span style={{ background: 'red', color: 'white', borderRadius: '10px', padding: '2px 6px', fontSize: '0.7rem', marginLeft: '5px' }}>{joinRequests.length}</span>}
+            {joinRequests.length > 0 && <span className="match-detail-tab-badge">{joinRequests.length}</span>}
           </button>
         )}
       </div>
@@ -226,9 +272,9 @@ export default function MatchDetail() {
         <div>
           <h3>Jugadores ({players.length}/{match.max_players})</h3>
           {players.length > 0 ? (
-            <ul style={{ listStyle: 'none', padding: 0 }}>
+            <ul className="match-players-list">
               {players.map(p => (
-                <li key={p.user_id} className="card" style={{ marginBottom: '0.5rem', padding: '0.75rem' }}>
+                <li key={p.user_id} className="card match-player-item">
                   <strong>{p.profiles?.name || 'Jugador'}</strong>
                 </li>
               ))}
@@ -266,36 +312,28 @@ export default function MatchDetail() {
       )}
 
       {activeTab === 'chat' && (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '400px' }}>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', background: '#f9f9f9', borderRadius: '8px', marginBottom: '1rem' }}>
+        <div className="match-chat-panel">
+          <div className="match-chat-messages">
             {messages.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#999' }}>No hay mensajes aún.</p>
+              <p className="match-chat-empty">No hay mensajes aun.</p>
             ) : (
               messages.map(msg => (
-                <div key={msg.id} style={{ marginBottom: '0.5rem', textAlign: msg.user_id === user?.id ? 'right' : 'left' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#666' }}>{msg.profiles?.name || 'Usuario'}</span>
-                  <div style={{ 
-                    display: 'inline-block', 
-                    padding: '0.5rem 1rem', 
-                    background: msg.user_id === user?.id ? 'var(--color-primary)' : '#e0e0e0',
-                    color: msg.user_id === user?.id ? 'white' : 'black',
-                    borderRadius: '15px',
-                    marginLeft: msg.user_id === user?.id ? 'auto' : '0'
-                  }}>
+                <div key={msg.id} className={`match-chat-message ${msg.user_id === user?.id ? 'mine' : ''}`}>
+                  <span className="match-chat-author">{msg.profiles?.name || 'Usuario'}</span>
+                  <div className={`match-chat-bubble ${msg.user_id === user?.id ? 'mine' : ''}`}>
                     {msg.message}
                   </div>
                 </div>
               ))
             )}
           </div>
-          <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '0.5rem' }}>
+          <form onSubmit={handleSendMessage} className="match-chat-form">
             <input 
               type="text" 
               value={newMessage} 
               onChange={e => setNewMessage(e.target.value)}
               placeholder="Escribe un mensaje..." 
               className="form-input" 
-              style={{ flex: 1 }}
             />
             <button type="submit" className="btn btn-primary">Enviar</button>
           </form>
