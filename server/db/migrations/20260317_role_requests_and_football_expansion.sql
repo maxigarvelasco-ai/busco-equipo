@@ -12,6 +12,9 @@ alter table if exists public.tournaments
   add constraint tournaments_football_type_check check (football_type in (5, 7, 8, 11));
 
 alter table if exists public.club_recruitments
+  add column if not exists football_type int;
+
+alter table if exists public.club_recruitments
   drop constraint if exists club_recruitments_football_type_check;
 alter table if exists public.club_recruitments
   add constraint club_recruitments_football_type_check check (football_type in (5, 7, 8, 11) or football_type is null);

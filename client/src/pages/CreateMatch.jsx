@@ -556,7 +556,7 @@ export default function CreateMatch() {
         ) : (
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>
-              Para publicar esta búsqueda necesitás tener aprobado el modo club desde tu perfil.
+              Para publicar esta búsqueda necesitás tener la cuenta habilitada (club/cancha) desde tu perfil.
             </div>
             <div className="form-group">
               <label className="form-label">Nombre del club/equipo</label>

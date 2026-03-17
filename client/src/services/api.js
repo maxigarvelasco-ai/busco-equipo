@@ -573,17 +573,16 @@ export const venuesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data: venueApproval } = await supabase
+    const { data: approvedAccess } = await supabase
       .from('role_upgrade_requests')
-      .select('id')
+      .select('id, desired_role')
       .eq('user_id', session.user.id)
-      .eq('desired_role', 'venue_member')
       .eq('status', 'approved')
       .limit(1)
       .maybeSingle();
 
-    if (!venueApproval?.id) {
-      throw new Error('Necesitas aprobacion para usar modo dueño de cancha. Solicitalo desde tu perfil.');
+    if (!approvedAccess?.id) {
+      throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
     const fullPayload = {
@@ -1057,17 +1056,16 @@ export const clubsAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data: clubApproval } = await supabase
+    const { data: approvedAccess } = await supabase
       .from('role_upgrade_requests')
-      .select('id')
+      .select('id, desired_role')
       .eq('user_id', session.user.id)
-      .eq('desired_role', 'club')
       .eq('status', 'approved')
       .limit(1)
       .maybeSingle();
 
-    if (!clubApproval?.id) {
-      throw new Error('Necesitas aprobacion para usar modo club. Solicitalo desde tu perfil.');
+    if (!approvedAccess?.id) {
+      throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
     const myClub = await this.ensureMine({

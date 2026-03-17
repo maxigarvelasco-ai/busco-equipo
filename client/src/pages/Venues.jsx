@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { venuesAPI } from '../services/api';
+import { roleRequestsAPI, venuesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 const SUGGESTED_VENUES = [
   { id: 's1', name: 'Tifosi Futbol', zone: 'Pichincha', city: 'Rosario', football: 'F5/F7', amenities: ['iluminacion', 'vestuarios', 'buffet'] },
@@ -51,10 +51,12 @@ function normalizeAddressLabel(value) {
 }
 
 export default function Venues() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [venues, setVenues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [canManageVenues, setCanManageVenues] = useState(false);
+  const [loadingRoleAccess, setLoadingRoleAccess] = useState(false);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -146,8 +148,6 @@ export default function Venues() {
     });
   });
 
-  const canManageVenues = user && profile?.profile_type === 'venue_member';
-
   useEffect(() => {
     const id = setInterval(() => {
       if (window.google?.maps?.places?.AutocompleteService) {
@@ -159,6 +159,23 @@ export default function Venues() {
   }, []);
 
   useEffect(() => {
+    async function fetchRoleAccess() {
+      if (!user) {
+        setCanManageVenues(false);
+        return;
+      }
+      try {
+        setLoadingRoleAccess(true);
+        const requests = await roleRequestsAPI.getMine();
+        const approved = (requests || []).some((r) => r.status === 'approved');
+        setCanManageVenues(approved);
+      } catch {
+        setCanManageVenues(false);
+      } finally {
+        setLoadingRoleAccess(false);
+      }
+    }
+
     async function fetchVenues() {
       try {
         setLoading(true);
@@ -170,6 +187,7 @@ export default function Venues() {
         setLoading(false);
       }
     }
+    fetchRoleAccess();
     fetchVenues();
     detectMyLocation();
   }, []);
@@ -248,9 +266,9 @@ export default function Venues() {
         )}
       </div>
 
-      {user && !canManageVenues && (
+      {user && !canManageVenues && !loadingRoleAccess && (
         <div className="card" style={{ marginBottom: '0.7rem', padding: '0.75rem', color: 'var(--color-text-secondary)' }}>
-          Solo perfiles "Miembro de canchas" pueden agregar canchas.
+          Para agregar canchas necesitás tener la cuenta habilitada (club/cancha). Pedila desde tu perfil.
         </div>
       )}
 
