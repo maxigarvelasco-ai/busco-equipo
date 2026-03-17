@@ -56,4 +56,49 @@ before update on public.role_upgrade_requests
 for each row
 execute function public.touch_role_upgrade_requests_updated_at();
 
+-- 3) Compatibility patch for legacy venues guard trigger.
+create or replace function public.enforce_venue_member_for_venues()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_has_approved boolean := false;
+  v_is_reviewer boolean := false;
+begin
+  if new.owner_id is null then
+    return new;
+  end if;
+
+  select exists(
+    select 1
+    from public.role_upgrade_requests r
+    where r.user_id = new.owner_id
+      and r.status = 'approved'
+  ) into v_has_approved;
+
+  select lower(coalesce(u.email, '')) = 'maximiliano.g.velasco@gmail.com'
+    into v_is_reviewer
+  from auth.users u
+  where u.id = new.owner_id;
+
+  if not coalesce(v_has_approved, false) and not coalesce(v_is_reviewer, false) then
+    raise exception 'account is not enabled for venue/club publishing';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_venue_member_insert on public.venues;
+create trigger trg_enforce_venue_member_insert
+before insert on public.venues
+for each row
+execute function public.enforce_venue_member_for_venues();
+
+drop trigger if exists trg_enforce_venue_member_owner_update on public.venues;
+create trigger trg_enforce_venue_member_owner_update
+before update of owner_id on public.venues
+for each row
+execute function public.enforce_venue_member_for_venues();
+
 commit;

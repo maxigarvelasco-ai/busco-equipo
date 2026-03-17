@@ -56,8 +56,12 @@ export default function Profile() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    if (window.location.hash !== '#buscar-perfiles') return;
-    const section = document.getElementById('buscar-perfiles');
+    const hash = window.location.hash;
+    const targetId = hash === '#accesos-especiales'
+      ? 'accesos-especiales'
+      : (hash === '#buscar-perfiles' ? 'buscar-perfiles' : null);
+    if (!targetId) return;
+    const section = document.getElementById(targetId);
     if (section) {
       section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -321,7 +325,7 @@ export default function Profile() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
+      <div id="accesos-especiales" className="card" style={{ marginTop: 'var(--space-xl)' }}>
         <h3 style={{ marginBottom: '0.8rem' }}>Accesos especiales</h3>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '0.8rem' }}>
           Tu cuenta sigue siendo normal y podés pedir habilitación para usar también modos especiales.

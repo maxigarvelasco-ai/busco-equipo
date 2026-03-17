@@ -573,15 +573,8 @@ export const venuesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data: approvedAccess } = await supabase
-      .from('role_upgrade_requests')
-      .select('id, desired_role')
-      .eq('user_id', session.user.id)
-      .eq('status', 'approved')
-      .limit(1)
-      .maybeSingle();
-
-    if (!approvedAccess?.id) {
+    const allowed = await hasPrivilegedAccess(session.user);
+    if (!allowed) {
       throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
@@ -857,6 +850,22 @@ export const notificationsAPI = {
 // ========== ROLE UPGRADE REQUESTS ==========
 
 const ADMIN_REVIEW_EMAIL = 'Maximiliano.g.velasco@gmail.com';
+const REVIEWER_EMAIL = 'maximiliano.g.velasco@gmail.com';
+
+async function hasPrivilegedAccess(sessionUser) {
+  const email = String(sessionUser?.email || '').toLowerCase();
+  if (email === REVIEWER_EMAIL) return true;
+
+  const { data } = await supabase
+    .from('role_upgrade_requests')
+    .select('id')
+    .eq('user_id', sessionUser?.id)
+    .eq('status', 'approved')
+    .limit(1)
+    .maybeSingle();
+
+  return !!data?.id;
+}
 
 export const roleRequestsAPI = {
   async getMine() {
@@ -1056,15 +1065,8 @@ export const clubsAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { data: approvedAccess } = await supabase
-      .from('role_upgrade_requests')
-      .select('id, desired_role')
-      .eq('user_id', session.user.id)
-      .eq('status', 'approved')
-      .limit(1)
-      .maybeSingle();
-
-    if (!approvedAccess?.id) {
+    const allowed = await hasPrivilegedAccess(session.user);
+    if (!allowed) {
       throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 

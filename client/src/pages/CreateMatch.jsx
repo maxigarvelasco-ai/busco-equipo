@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { clubsAPI, matchesAPI, roleRequestsAPI, tournamentsAPI } from '../services/api';
 
 export default function CreateMatch() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [hasPrivilegedAccess, setHasPrivilegedAccess] = useState(false);
 
   const [requestType, setRequestType] = useState('casual_match');
   const [footballMode, setFootballMode] = useState('f5');
@@ -188,6 +191,34 @@ export default function CreateMatch() {
   }, []);
 
   useEffect(() => {
+    async function loadAccess() {
+      if (!user) {
+        setHasPrivilegedAccess(false);
+        return;
+      }
+      try {
+        const isReviewer = String(user.email || '').toLowerCase() === 'maximiliano.g.velasco@gmail.com';
+        if (isReviewer) {
+          setHasPrivilegedAccess(true);
+          return;
+        }
+        const requests = await roleRequestsAPI.getMine();
+        const approved = (requests || []).some((r) => r.status === 'approved');
+        setHasPrivilegedAccess(approved);
+      } catch {
+        setHasPrivilegedAccess(false);
+      }
+    }
+    loadAccess();
+  }, [user]);
+
+  useEffect(() => {
+    if (!hasPrivilegedAccess && requestType === 'club_recruitment') {
+      setRequestType('casual_match');
+    }
+  }, [hasPrivilegedAccess, requestType]);
+
+  useEffect(() => {
     const query = (currentAddressQuery || '').trim();
     if (query.length < 1) {
       setAddressSuggestions([]);
@@ -344,11 +375,41 @@ export default function CreateMatch() {
               <input type="radio" name="request_type" checked={requestType === 'tournament_request'} onChange={() => setRequestType('tournament_request')} />
               Completar equipo para torneo
             </label>
-            <label className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.7rem' }}>
-              <input type="radio" name="request_type" checked={requestType === 'club_recruitment'} onChange={() => setRequestType('club_recruitment')} />
+            <label
+              className="card"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.55rem',
+                padding: '0.7rem',
+                opacity: hasPrivilegedAccess ? 1 : 0.55,
+                cursor: hasPrivilegedAccess ? 'pointer' : 'not-allowed',
+              }}
+            >
+              <input
+                type="radio"
+                name="request_type"
+                checked={requestType === 'club_recruitment'}
+                onChange={() => setRequestType('club_recruitment')}
+                disabled={!hasPrivilegedAccess}
+              />
               Para mi club o categoría
             </label>
           </div>
+          {!hasPrivilegedAccess && (
+            <div className="card" style={{ marginTop: '0.55rem', padding: '0.7rem' }}>
+              <div style={{ color: 'var(--color-text-muted)', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                Esta opción está bloqueada en cuenta normal.
+              </div>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => navigate('/profile#accesos-especiales')}
+              >
+                Ir a Perfil para solicitar
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="form-group">
