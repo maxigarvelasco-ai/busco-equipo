@@ -260,6 +260,7 @@ export default function Feed() {
         joined: m.players_joined ?? m.current_players ?? 0,
         total: m.max_players,
         organizer_name: m.creator_name || 'Anónimo',
+        organizer_id: m.owner_id ?? m.creator_id ?? null,
         raw: m,
         distanceKm,
         match_gender: m.match_gender || 'mixto',
@@ -404,6 +405,23 @@ export default function Feed() {
               <div className="match-info-row">
                 <span className="info-icon">📍</span>
                 <span>{req.locationLabel || 'Sin ubicacion'}</span>
+              </div>
+              <div className="match-info-row">
+                <span className="info-icon">👤</span>
+                {req.organizer_id ? (
+                  <button
+                    type="button"
+                    className="link-button-inline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/users/${req.organizer_id}`);
+                    }}
+                  >
+                    Organiza: {req.organizer_name || 'Anónimo'}
+                  </button>
+                ) : (
+                  <span>Organiza: {req.organizer_name || 'Anónimo'}</span>
+                )}
               </div>
               <div className="match-info-row">
                 <span className="info-icon">🕒</span>
