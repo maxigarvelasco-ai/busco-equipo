@@ -35,41 +35,62 @@ export default function Venues() {
     return window.__buscoEquipoPlacesService;
   };
 
+  const canUsePlacesNew = () => !window.__buscoEquipoDisablePlacesNew;
+
+  const shouldDisablePlacesNew = (err) => {
+    const msg = String(err?.message || '').toLowerCase();
+    const status = String(err?.status || '').toLowerCase();
+    const code = String(err?.code || '').toLowerCase();
+    return (
+      msg.includes('403')
+      || msg.includes('forbidden')
+      || msg.includes('permission')
+      || msg.includes('api key')
+      || msg.includes('not authorized')
+      || status.includes('permission_denied')
+      || code === '403'
+    );
+  };
+
   const fetchAddressSuggestions = async (query) => {
     if (!window.google?.maps) return [];
 
     try {
-      const placesLib = await window.google.maps.importLibrary('places');
-      const Suggestion = placesLib?.AutocompleteSuggestion;
-      if (Suggestion?.fetchAutocompleteSuggestions) {
-        const response = await Suggestion.fetchAutocompleteSuggestions({
-          input: query,
-          language: 'es',
-        });
-        const raw = response?.suggestions || [];
-        const mapped = raw.map((s) => {
-          const p = s?.placePrediction;
-          const label =
-            p?.text?.text
-            || p?.structuredFormat?.mainText?.text
-            || p?.mainText?.text
-            || '';
-          const secondary =
-            p?.structuredFormat?.secondaryText?.text
-            || p?.secondaryText?.text
-            || '';
-          const full = secondary ? `${label}, ${secondary}` : label;
-          const city = secondary ? secondary.split(',')[0].trim() : '';
-          return {
-            label: full,
-            city,
-          };
-        }).filter((x) => x.label);
+      if (canUsePlacesNew()) {
+        const placesLib = await window.google.maps.importLibrary('places');
+        const Suggestion = placesLib?.AutocompleteSuggestion;
+        if (Suggestion?.fetchAutocompleteSuggestions) {
+          const response = await Suggestion.fetchAutocompleteSuggestions({
+            input: query,
+            language: 'es',
+          });
+          const raw = response?.suggestions || [];
+          const mapped = raw.map((s) => {
+            const p = s?.placePrediction;
+            const label =
+              p?.text?.text
+              || p?.structuredFormat?.mainText?.text
+              || p?.mainText?.text
+              || '';
+            const secondary =
+              p?.structuredFormat?.secondaryText?.text
+              || p?.secondaryText?.text
+              || '';
+            const full = secondary ? `${label}, ${secondary}` : label;
+            const city = secondary ? secondary.split(',')[0].trim() : '';
+            return {
+              label: full,
+              city,
+            };
+          }).filter((x) => x.label);
 
-        if (mapped.length > 0) return mapped;
+          if (mapped.length > 0) return mapped;
+        }
       }
-    } catch {
-      // fallback below
+    } catch (err) {
+      if (shouldDisablePlacesNew(err)) {
+        window.__buscoEquipoDisablePlacesNew = true;
+      }
     }
 
     const service = getPlacesAutocompleteService();
