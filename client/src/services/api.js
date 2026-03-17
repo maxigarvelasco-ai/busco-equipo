@@ -538,14 +538,17 @@ export const profilesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('direct_messages')
       .insert({
         from_user_id: session.user.id,
         to_user_id: toUserId,
         message,
-      });
+      })
+      .select()
+      .single();
     if (error) throw error;
+    return data;
   },
 };
 

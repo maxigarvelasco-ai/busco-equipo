@@ -14,6 +14,10 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
+  const [isEditingFicha, setIsEditingFicha] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
   const [editForm, setEditForm] = useState({
     name: '',
     birth_date: '',
@@ -94,6 +98,7 @@ export default function Profile() {
       const { error } = await updateProfile(updates);
       if (error) throw error;
       setSaveMsg('Perfil actualizado');
+      setIsEditingFicha(false);
       setTimeout(() => setSaveMsg(''), 2500);
     } catch (err) {
       setSaveMsg(err.message || 'No se pudo guardar');
@@ -108,6 +113,25 @@ export default function Profile() {
   const initial = profile.name ? profile.name[0].toUpperCase() : '?';
   const joined = new Date(profile.created_at).toLocaleDateString('es-AR', { year: 'numeric', month: 'long' });
   const isPro = subscription && new Date(subscription.expires_at) > new Date();
+
+  async function handleSearchProfiles(e) {
+    e.preventDefault();
+    const q = searchTerm.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const list = await profilesAPI.searchProfiles(q, user.id);
+      setSearchResults(list || []);
+    } catch (err) {
+      console.error('Error searching profiles:', err);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   return (
     <div className="page-content">
@@ -153,7 +177,31 @@ export default function Profile() {
       </div>
 
       <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
-        <h3 style={{ marginBottom: '0.8rem' }}>Mi ficha de jugador</h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
+          <h3>Mi ficha de jugador</h3>
+          {!isEditingFicha ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingFicha(true)}>
+              Editar ficha
+            </button>
+          ) : (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditingFicha(false)}>
+              Cancelar
+            </button>
+          )}
+        </div>
+
+        {!isEditingFicha ? (
+          <div style={{ display: 'grid', gap: '0.6rem' }}>
+            <div className="match-info-row"><span className="info-icon">🧍</span><span><strong>Nombre:</strong> {profile.name || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[profile.city, profile.zone].filter(Boolean).join(' - ') || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {profile.bio || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">📞</span><span><strong>Teléfono:</strong> {profile.phone || '-'}</span></div>
+          </div>
+        ) : (
         <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: '0.75rem' }}>
           <div className="form-row">
             <div className="form-group">
@@ -224,6 +272,46 @@ export default function Profile() {
             {saving ? 'Guardando...' : 'Guardar perfil'}
           </button>
         </form>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
+        <h3 style={{ marginBottom: '0.8rem' }}>Buscar perfiles</h3>
+        <form onSubmit={handleSearchProfiles} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.8rem' }}>
+          <input
+            className="form-input"
+            style={{ flex: 1 }}
+            placeholder="Nombre, ciudad o zona"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button className="btn btn-primary" type="submit" disabled={searching}>
+            {searching ? 'Buscando...' : 'Buscar'}
+          </button>
+        </form>
+
+        {searchResults.length > 0 ? (
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            {searchResults.map((p) => (
+              <div key={p.id} className="card" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{p.name || 'Sin nombre'}</div>
+                  <div style={{ color: 'var(--color-text-muted)', fontSize: '0.85rem' }}>{[p.city, p.zone].filter(Boolean).join(' - ') || 'Sin ubicación'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate(`/users/${p.id}`)}>
+                    Ver ficha
+                  </button>
+                  <button className="btn btn-primary btn-sm" type="button" onClick={() => navigate(`/users/${p.id}`)}>
+                    Mensaje
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: 'var(--color-text-muted)' }}>Buscá jugadores para ver su ficha y chatear en tiempo real.</p>
+        )}
       </div>
 
       <div className="profile-actions">

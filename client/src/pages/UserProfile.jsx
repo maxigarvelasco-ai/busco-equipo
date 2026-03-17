@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { profilesAPI } from '../services/api';
+import { supabase } from '../services/supabaseClient';
 
 export default function UserProfile() {
   const { id } = useParams();
@@ -15,6 +16,29 @@ export default function UserProfile() {
   useEffect(() => {
     if (id) loadData();
   }, [id]);
+
+  useEffect(() => {
+    if (!user?.id || !id) return;
+    const me = String(user.id);
+    const other = String(id);
+
+    const channel = supabase
+      .channel(`dm_${me}_${other}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, (payload) => {
+        const msg = payload?.new || payload?.record;
+        if (!msg) return;
+        const from = String(msg.from_user_id);
+        const to = String(msg.to_user_id);
+        const isConversation = (from === me && to === other) || (from === other && to === me);
+        if (!isConversation) return;
+        setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, id]);
 
   async function loadData() {
     try {
@@ -47,9 +71,11 @@ export default function UserProfile() {
     const text = newMessage.trim();
     if (!text) return;
     try {
-      await profilesAPI.sendDirectMessage(id, text);
+      const inserted = await profilesAPI.sendDirectMessage(id, text);
+      if (inserted) {
+        setMessages((prev) => (prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted]));
+      }
       setNewMessage('');
-      await loadData();
     } catch (err) {
       console.error('Error sending direct message:', err);
       alert('No se pudo enviar el mensaje');
@@ -86,6 +112,15 @@ export default function UserProfile() {
             <button className="btn btn-secondary" onClick={handleAddContact}>Agregar contacto</button>
           </div>
         )}
+
+        <div className="match-info" style={{ marginTop: '0.8rem' }}>
+          <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>
+          <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>
+          <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[profile.city, profile.zone].filter(Boolean).join(' - ') || '-'}</span></div>
+          <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>
+          <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>
+          <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {profile.bio || '-'}</span></div>
+        </div>
       </div>
 
       <div className="card">
