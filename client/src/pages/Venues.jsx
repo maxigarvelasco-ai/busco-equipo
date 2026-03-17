@@ -52,10 +52,20 @@ export default function Venues() {
   };
 
   const inferCityFromPrediction = (prediction) => {
-    const terms = prediction?.terms || [];
-    if (terms.length >= 2) return terms[1]?.value || '';
     const secondary = prediction?.structured_formatting?.secondary_text || '';
-    return secondary ? secondary.split(',')[0].trim() : '';
+    if (secondary) {
+      const cityFromSecondary = secondary
+        .split(',')
+        .map((p) => p.trim())
+        .find((part) => part && !/^\d+[a-zA-Z]?$/.test(part));
+      if (cityFromSecondary) return cityFromSecondary;
+    }
+
+    const terms = (prediction?.terms || []).map((t) => (t?.value || '').trim()).filter(Boolean);
+    if (terms.length === 0) return '';
+    const afterStreet = terms.slice(1);
+    const cityCandidate = afterStreet.find((part) => !/^\d+[a-zA-Z]?$/.test(part));
+    return cityCandidate || '';
   };
 
   const inferCityFromText = (address) => {
@@ -221,7 +231,7 @@ export default function Venues() {
               value={form.address}
               onFocus={() => setShowAddressSuggestions(true)}
               onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 120)}
-              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value, inferred_city: '' }))}
               required
             />
             {showAddressSuggestions && addressSuggestions.length > 0 && (
