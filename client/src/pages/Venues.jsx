@@ -22,6 +22,8 @@ export default function Venues() {
   });
   const [citySuggestions, setCitySuggestions] = useState([]);
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
 
   const getPlacesAutocompleteService = () => {
     if (!window.google?.maps?.places?.AutocompleteService) return null;
@@ -76,7 +78,7 @@ export default function Venues() {
 
   useEffect(() => {
     const query = (form.city || '').trim();
-    if (query.length < 2) {
+    if (query.length < 1) {
       setCitySuggestions([]);
       return;
     }
@@ -95,6 +97,7 @@ export default function Venues() {
             input: query,
             types: ['(cities)'],
             componentRestrictions: { country: 'ar' },
+            language: 'es',
           },
           (result, status) => {
             const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
@@ -123,6 +126,53 @@ export default function Venues() {
     };
   }, [form.city]);
 
+  useEffect(() => {
+    const query = (form.address || '').trim();
+    if (query.length < 1) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = setTimeout(async () => {
+      const service = getPlacesAutocompleteService();
+      if (!service) {
+        if (!cancelled) setAddressSuggestions([]);
+        return;
+      }
+
+      const predictions = await new Promise((resolve) => {
+        service.getPlacePredictions(
+          {
+            input: query,
+            types: ['address'],
+            componentRestrictions: { country: 'ar' },
+            language: 'es',
+          },
+          (result, status) => {
+            const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
+            resolve(ok ? (result || []) : []);
+          }
+        );
+      });
+
+      if (cancelled) return;
+      const normalizedQuery = query.toLowerCase();
+      const labels = predictions.map((p) => p.description).filter(Boolean);
+      const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
+      const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
+      const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
+
+      setAddressSuggestions(names);
+      setShowAddressSuggestions(true);
+    }, 260);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [form.address]);
+
   return (
     <div className="page-content">
       <div className="page-header">
@@ -148,7 +198,29 @@ export default function Venues() {
           </div>
           <div className="form-group">
             <label className="form-label">Direccion</label>
-            <input className="form-input" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} required />
+            <input
+              className="form-input"
+              value={form.address}
+              onFocus={() => setShowAddressSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowAddressSuggestions(false), 120)}
+              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+              required
+            />
+            {showAddressSuggestions && addressSuggestions.length > 0 && (
+              <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
+                {addressSuggestions.map((address) => (
+                  <button
+                    key={address}
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
+                    onMouseDown={() => setForm((p) => ({ ...p, address }))}
+                  >
+                    {address}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="form-group">
             <label className="form-label">Ciudad</label>
