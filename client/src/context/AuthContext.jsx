@@ -8,6 +8,11 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accountMode, setAccountModeState] = useState(() => {
+    if (typeof window === 'undefined') return 'normal';
+    const saved = String(window.localStorage.getItem('be_active_account_mode') || 'normal');
+    return ['normal', 'club', 'venue'].includes(saved) ? saved : 'normal';
+  });
 
   const mountedRef = useRef(true);
 
@@ -151,6 +156,18 @@ export function AuthProvider({ children }) {
     setUser(null);
     setProfile(null);
     setSession(null);
+    setAccountModeState('normal');
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('be_active_account_mode', 'normal');
+    }
+  };
+
+  const setAccountMode = (mode) => {
+    const next = ['normal', 'club', 'venue'].includes(mode) ? mode : 'normal';
+    setAccountModeState(next);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('be_active_account_mode', next);
+    }
   };
 
   const updateProfile = async (updates) => {
@@ -174,6 +191,8 @@ export function AuthProvider({ children }) {
       profile,
       session,
       loading,
+      accountMode,
+      setAccountMode,
       login,
       register,
       loginWithGoogle,

@@ -8,6 +8,17 @@ alter table if exists public.profiles
   drop constraint if exists profiles_profile_type_check;
 alter table if exists public.profiles
   add constraint profiles_profile_type_check check (profile_type in ('normal', 'venue_member', 'club'));
+alter table if exists public.profiles
+  add column if not exists club_name text,
+  add column if not exists club_bio text,
+  add column if not exists club_city text,
+  add column if not exists club_zone text,
+  add column if not exists club_phone text,
+  add column if not exists venue_name text,
+  add column if not exists venue_bio text,
+  add column if not exists venue_city text,
+  add column if not exists venue_zone text,
+  add column if not exists venue_phone text;
 
 -- 2) Matches/Tournaments football types: include F8.
 alter table if exists public.matches

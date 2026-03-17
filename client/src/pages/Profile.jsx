@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { profilesAPI, roleRequestsAPI, subscriptionsAPI } from '../services/api';
+import { clubsAPI, profilesAPI, roleRequestsAPI, subscriptionsAPI } from '../services/api';
 import ReportModal from '../components/ReportModal';
 
 export default function Profile() {
-  const { user, profile, logout, updateProfile } = useAuth();
+  const { user, profile, logout, updateProfile, accountMode, setAccountMode } = useAuth();
   const navigate = useNavigate();
   const [matchesJoined, setMatchesJoined] = useState([]);
   const [matchesAbandoned, setMatchesAbandoned] = useState([]);
@@ -32,6 +32,16 @@ export default function Profile() {
     preferred_foot: '',
     bio: '',
     phone: '',
+    club_name: '',
+    club_city: '',
+    club_zone: '',
+    club_bio: '',
+    club_phone: '',
+    venue_name: '',
+    venue_city: '',
+    venue_zone: '',
+    venue_bio: '',
+    venue_phone: '',
     is_profile_public: true,
   });
 
@@ -51,9 +61,24 @@ export default function Profile() {
       preferred_foot: profile.preferred_foot || '',
       bio: profile.bio || '',
       phone: profile.phone || '',
+      club_name: profile.club_name || '',
+      club_city: profile.club_city || '',
+      club_zone: profile.club_zone || '',
+      club_bio: profile.club_bio || '',
+      club_phone: profile.club_phone || '',
+      venue_name: profile.venue_name || '',
+      venue_city: profile.venue_city || '',
+      venue_zone: profile.venue_zone || '',
+      venue_bio: profile.venue_bio || '',
+      venue_phone: profile.venue_phone || '',
       is_profile_public: profile.is_profile_public !== false,
     });
   }, [profile]);
+
+  useEffect(() => {
+    if (!['normal', 'club', 'venue'].includes(accountMode)) return;
+    setProfileViewMode(accountMode);
+  }, [accountMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -95,13 +120,17 @@ export default function Profile() {
       const isOrgMode = profileViewMode !== 'normal';
       let computedAge = null;
       if (isOrgMode) {
-        if (!String(editForm.name || '').trim()) {
+        const orgName = profileViewMode === 'club' ? editForm.club_name : editForm.venue_name;
+        const orgCity = profileViewMode === 'club' ? editForm.club_city : editForm.venue_city;
+        const orgZone = profileViewMode === 'club' ? editForm.club_zone : editForm.venue_zone;
+        const orgPhone = profileViewMode === 'club' ? editForm.club_phone : editForm.venue_phone;
+        if (!String(orgName || '').trim()) {
           throw new Error('Completá el nombre del club/cancha');
         }
-        if (!String(editForm.city || '').trim() && !String(editForm.zone || '').trim()) {
+        if (!String(orgCity || '').trim() && !String(orgZone || '').trim()) {
           throw new Error('Completá la dirección (ciudad o zona) del club/cancha');
         }
-        if (!String(editForm.phone || '').trim()) {
+        if (!String(orgPhone || '').trim()) {
           throw new Error('Completá el teléfono del club/cancha');
         }
       }
@@ -116,21 +145,49 @@ export default function Profile() {
         }
       }
 
-      const updates = {
-        name: editForm.name,
-        birth_date: isOrgMode ? (profile?.birth_date || null) : (editForm.birth_date || null),
-        age: isOrgMode ? (profile?.age ?? null) : computedAge,
-        gender: isOrgMode ? (profile?.gender || null) : (editForm.gender || null),
-        city: editForm.city || null,
-        zone: editForm.zone || null,
-        preferred_position: editForm.preferred_position || null,
-        preferred_foot: editForm.preferred_foot || null,
-        bio: editForm.bio || null,
-        phone: editForm.phone || null,
-        is_profile_public: !!editForm.is_profile_public,
-      };
+      const updates = isOrgMode
+        ? (profileViewMode === 'club'
+          ? {
+            club_name: editForm.club_name || null,
+            club_city: editForm.club_city || null,
+            club_zone: editForm.club_zone || null,
+            club_bio: editForm.club_bio || null,
+            club_phone: editForm.club_phone || null,
+            is_profile_public: !!editForm.is_profile_public,
+          }
+          : {
+            venue_name: editForm.venue_name || null,
+            venue_city: editForm.venue_city || null,
+            venue_zone: editForm.venue_zone || null,
+            venue_bio: editForm.venue_bio || null,
+            venue_phone: editForm.venue_phone || null,
+            is_profile_public: !!editForm.is_profile_public,
+          })
+        : {
+          name: editForm.name,
+          birth_date: editForm.birth_date || null,
+          age: computedAge,
+          gender: editForm.gender || null,
+          city: editForm.city || null,
+          zone: editForm.zone || null,
+          preferred_position: editForm.preferred_position || null,
+          preferred_foot: editForm.preferred_foot || null,
+          bio: editForm.bio || null,
+          phone: editForm.phone || null,
+          is_profile_public: !!editForm.is_profile_public,
+        };
       const { error } = await updateProfile(updates);
       if (error) throw error;
+      if (profileViewMode === 'club') {
+        await clubsAPI.upsertMineProfile({
+          name: editForm.club_name || null,
+          address: [editForm.club_city, editForm.club_zone].filter(Boolean).join(' - ') || null,
+          phone: editForm.club_phone || null,
+          city: editForm.club_city || null,
+          zone: editForm.club_zone || null,
+          description: editForm.club_bio || null,
+        }).catch(() => null);
+      }
       setSaveMsg('Perfil actualizado');
       setIsEditingFicha(false);
       setTimeout(() => setSaveMsg(''), 2500);
@@ -150,6 +207,26 @@ export default function Profile() {
   const hasClubAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'club' && r.status === 'approved');
   const hasVenueAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'venue_member' && r.status === 'approved');
   const isOrgMode = profileViewMode !== 'normal';
+  const activeName = profileViewMode === 'club'
+    ? (profile?.club_name || '-')
+    : (profileViewMode === 'venue' ? (profile?.venue_name || '-') : (profile?.name || '-'));
+  const activeCity = profileViewMode === 'club'
+    ? (profile?.club_city || '')
+    : (profileViewMode === 'venue' ? (profile?.venue_city || '') : (profile?.city || ''));
+  const activeZone = profileViewMode === 'club'
+    ? (profile?.club_zone || '')
+    : (profileViewMode === 'venue' ? (profile?.venue_zone || '') : (profile?.zone || ''));
+  const activeBio = profileViewMode === 'club'
+    ? (profile?.club_bio || '-')
+    : (profileViewMode === 'venue' ? (profile?.venue_bio || '-') : (profile?.bio || '-'));
+  const activePhone = profileViewMode === 'club'
+    ? (profile?.club_phone || '-')
+    : (profileViewMode === 'venue' ? (profile?.venue_phone || '-') : (profile?.phone || '-'));
+  const orgEditName = profileViewMode === 'club' ? editForm.club_name : editForm.venue_name;
+  const orgEditCity = profileViewMode === 'club' ? editForm.club_city : editForm.venue_city;
+  const orgEditZone = profileViewMode === 'club' ? editForm.club_zone : editForm.venue_zone;
+  const orgEditBio = profileViewMode === 'club' ? editForm.club_bio : editForm.venue_bio;
+  const orgEditPhone = profileViewMode === 'club' ? editForm.club_phone : editForm.venue_phone;
   const profileViewLabel = profileViewMode === 'club'
     ? 'Mi ficha de club'
     : (profileViewMode === 'venue' ? 'Mi ficha de cancha' : 'Mi ficha de jugador');
@@ -157,12 +234,14 @@ export default function Profile() {
   useEffect(() => {
     if (profileViewMode === 'club' && !hasClubAccess) {
       setProfileViewMode('normal');
+      setAccountMode('normal');
       return;
     }
     if (profileViewMode === 'venue' && !hasVenueAccess) {
       setProfileViewMode('normal');
+      setAccountMode('normal');
     }
-  }, [profileViewMode, hasClubAccess, hasVenueAccess]);
+  }, [profileViewMode, hasClubAccess, hasVenueAccess, setAccountMode]);
 
   if (!user) return null;
   if (!profile) return <div className="page-content"><div className="loading-spinner"><div className="spinner"></div></div></div>;
@@ -275,14 +354,20 @@ export default function Profile() {
             <button
               type="button"
               className={`btn btn-sm ${profileViewMode === 'normal' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setProfileViewMode('normal')}
+              onClick={() => {
+                setProfileViewMode('normal');
+                setAccountMode('normal');
+              }}
             >
               Ver como normal
             </button>
             <button
               type="button"
               className={`btn btn-sm ${profileViewMode === 'club' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setProfileViewMode('club')}
+              onClick={() => {
+                setProfileViewMode('club');
+                setAccountMode('club');
+              }}
               disabled={!hasClubAccess}
             >
               Ver como club
@@ -290,7 +375,10 @@ export default function Profile() {
             <button
               type="button"
               className={`btn btn-sm ${profileViewMode === 'venue' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setProfileViewMode('venue')}
+              onClick={() => {
+                setProfileViewMode('venue');
+                setAccountMode('venue');
+              }}
               disabled={!hasVenueAccess}
             >
               Ver como cancha
@@ -300,21 +388,31 @@ export default function Profile() {
 
         {!isEditingFicha ? (
           <div style={{ display: 'grid', gap: '0.6rem' }}>
-            <div className="match-info-row"><span className="info-icon">🧍</span><span><strong>Nombre:</strong> {profile.name || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">🧍</span><span><strong>Nombre:</strong> {activeName}</span></div>
             {!isOrgMode && <div className="match-info-row"><span className="info-icon">🎂</span><span><strong>Nacimiento:</strong> {profile.birth_date ? new Date(profile.birth_date).toLocaleDateString('es-AR') : '-'}</span></div>}
             {!isOrgMode && <div className="match-info-row"><span className="info-icon">⚧️</span><span><strong>Sexo:</strong> {profile.gender || '-'}</span></div>}
-            <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[profile.city, profile.zone].filter(Boolean).join(' - ') || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">📍</span><span><strong>Ciudad/Zona:</strong> {[activeCity, activeZone].filter(Boolean).join(' - ') || '-'}</span></div>
             {!isOrgMode && <div className="match-info-row"><span className="info-icon">⚽</span><span><strong>Posición:</strong> {profile.preferred_position || '-'}</span></div>}
             {!isOrgMode && <div className="match-info-row"><span className="info-icon">🦶</span><span><strong>Pierna hábil:</strong> {profile.preferred_foot || '-'}</span></div>}
-            <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {profile.bio || '-'}</span></div>
-            <div className="match-info-row"><span className="info-icon">📞</span><span><strong>Teléfono:</strong> {profile.phone || '-'}</span></div>
+            <div className="match-info-row"><span className="info-icon">📝</span><span><strong>Bio:</strong> {activeBio}</span></div>
+            <div className="match-info-row"><span className="info-icon">📞</span><span><strong>Teléfono:</strong> {activePhone}</span></div>
           </div>
         ) : (
         <form onSubmit={handleSaveProfile} style={{ display: 'grid', gap: '0.75rem' }}>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">{isOrgMode ? 'Nombre del club/cancha' : 'Nombre'}</label>
-              <input className="form-input" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} required />
+              <input
+                className="form-input"
+                value={isOrgMode ? orgEditName : editForm.name}
+                onChange={(e) => setEditForm((p) => ({
+                  ...p,
+                  ...(isOrgMode
+                    ? (profileViewMode === 'club' ? { club_name: e.target.value } : { venue_name: e.target.value })
+                    : { name: e.target.value }),
+                }))}
+                required
+              />
             </div>
           </div>
 
@@ -335,11 +433,31 @@ export default function Profile() {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">{isOrgMode ? 'Ciudad (dirección)' : 'Ciudad'}</label>
-              <input className="form-input" value={editForm.city} onChange={(e) => setEditForm((p) => ({ ...p, city: e.target.value }))} required={isOrgMode && !String(editForm.zone || '').trim()} />
+              <input
+                className="form-input"
+                value={isOrgMode ? orgEditCity : editForm.city}
+                onChange={(e) => setEditForm((p) => ({
+                  ...p,
+                  ...(isOrgMode
+                    ? (profileViewMode === 'club' ? { club_city: e.target.value } : { venue_city: e.target.value })
+                    : { city: e.target.value }),
+                }))}
+                required={isOrgMode && !String(orgEditZone || '').trim()}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">{isOrgMode ? 'Zona/Barrio (dirección)' : 'Zona'}</label>
-              <input className="form-input" value={editForm.zone} onChange={(e) => setEditForm((p) => ({ ...p, zone: e.target.value }))} required={isOrgMode && !String(editForm.city || '').trim()} />
+              <input
+                className="form-input"
+                value={isOrgMode ? orgEditZone : editForm.zone}
+                onChange={(e) => setEditForm((p) => ({
+                  ...p,
+                  ...(isOrgMode
+                    ? (profileViewMode === 'club' ? { club_zone: e.target.value } : { venue_zone: e.target.value })
+                    : { zone: e.target.value }),
+                }))}
+                required={isOrgMode && !String(orgEditCity || '').trim()}
+              />
             </div>
           </div>
 
@@ -361,12 +479,31 @@ export default function Profile() {
 
           <div className="form-group">
             <label className="form-label">Bio</label>
-            <textarea className="form-textarea" value={editForm.bio} onChange={(e) => setEditForm((p) => ({ ...p, bio: e.target.value }))} />
+            <textarea
+              className="form-textarea"
+              value={isOrgMode ? orgEditBio : editForm.bio}
+              onChange={(e) => setEditForm((p) => ({
+                ...p,
+                ...(isOrgMode
+                  ? (profileViewMode === 'club' ? { club_bio: e.target.value } : { venue_bio: e.target.value })
+                  : { bio: e.target.value }),
+              }))}
+            />
           </div>
 
           <div className="form-group">
             <label className="form-label">{isOrgMode ? 'Teléfono de contacto' : 'Teléfono'}</label>
-            <input className="form-input" value={editForm.phone} onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))} required={isOrgMode} />
+            <input
+              className="form-input"
+              value={isOrgMode ? orgEditPhone : editForm.phone}
+              onChange={(e) => setEditForm((p) => ({
+                ...p,
+                ...(isOrgMode
+                  ? (profileViewMode === 'club' ? { club_phone: e.target.value } : { venue_phone: e.target.value })
+                  : { phone: e.target.value }),
+              }))}
+              required={isOrgMode}
+            />
           </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>

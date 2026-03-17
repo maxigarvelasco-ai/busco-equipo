@@ -578,7 +578,7 @@ export const venuesAPI = {
       throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
-    const orgReq = await getMyOrgProfileRequirements(session.user.id);
+    const orgReq = await getMyOrgProfileRequirements(session.user.id, 'venue');
     if (!orgReq.isComplete) {
       throw new Error('Completá tu ficha (nombre, dirección y teléfono) para publicar como club/cancha.');
     }
@@ -888,18 +888,20 @@ async function hasPrivilegedAccess(sessionUser) {
   return !!data?.id;
 }
 
-async function getMyOrgProfileRequirements(userId) {
+async function getMyOrgProfileRequirements(userId, mode = 'club') {
   const { data: profile, error } = await supabase
     .from('profiles')
-    .select('name, city, zone, phone')
+    .select('name, city, zone, phone, club_name, club_bio, club_city, club_zone, club_phone, venue_name, venue_bio, venue_city, venue_zone, venue_phone')
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
 
-  const profileName = String(profile?.name || '').trim();
-  const phone = String(profile?.phone || '').trim();
-  const city = String(profile?.city || '').trim();
-  const zone = String(profile?.zone || '').trim();
+  const isVenue = mode === 'venue';
+  const profileName = String(isVenue ? (profile?.venue_name || '') : (profile?.club_name || '')).trim();
+  const phone = String(isVenue ? (profile?.venue_phone || '') : (profile?.club_phone || '')).trim();
+  const city = String(isVenue ? (profile?.venue_city || '') : (profile?.club_city || '')).trim();
+  const zone = String(isVenue ? (profile?.venue_zone || '') : (profile?.club_zone || '')).trim();
+  const bio = String(isVenue ? (profile?.venue_bio || '') : (profile?.club_bio || '')).trim();
 
   const hasName = profileName.length > 0;
   const hasPhone = phone.length > 0;
@@ -911,6 +913,7 @@ async function getMyOrgProfileRequirements(userId) {
     phone,
     city,
     zone,
+    bio,
     hasName,
     hasPhone,
     hasAddress,
@@ -1054,6 +1057,31 @@ export const clubsAPI = {
     return data;
   },
 
+  async upsertMineProfile(clubData = {}) {
+    const existing = await this.getMine().catch(() => null);
+    if (!existing?.id) {
+      return this.ensureMine(clubData);
+    }
+
+    const payload = {
+      name: clubData.name || existing.name,
+      address: clubData.address || existing.address || null,
+      phone: clubData.phone || existing.phone || null,
+      city: clubData.city || existing.city || null,
+      zone: clubData.zone || existing.zone || null,
+      description: clubData.description || existing.description || null,
+    };
+
+    const { data, error } = await supabase
+      .from('clubs')
+      .update(payload)
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
   async getMembers(clubId) {
     const { data, error } = await supabase
       .from('club_members')
@@ -1149,7 +1177,7 @@ export const clubsAPI = {
       throw new Error('Necesitas tener la cuenta habilitada para publicar como club/cancha. Solicitalo desde tu perfil.');
     }
 
-    const orgReq = await getMyOrgProfileRequirements(session.user.id);
+    const orgReq = await getMyOrgProfileRequirements(session.user.id, 'club');
     if (!orgReq.isComplete) {
       throw new Error('Completá tu ficha (nombre, dirección y teléfono) para publicar como club/cancha.');
     }
@@ -1160,7 +1188,7 @@ export const clubsAPI = {
       phone: recruitmentData.club_phone || orgReq.phone || null,
       city: recruitmentData.city || orgReq.city || null,
       zone: recruitmentData.zone || orgReq.zone || null,
-      description: recruitmentData.club_description,
+      description: recruitmentData.club_description || orgReq.bio || null,
     });
 
     const fullPayload = {

@@ -5,7 +5,7 @@ import { clubsAPI, matchesAPI, roleRequestsAPI, tournamentsAPI } from '../servic
 
 export default function CreateMatch() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile, accountMode } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [hasPrivilegedAccess, setHasPrivilegedAccess] = useState(false);
@@ -218,6 +218,23 @@ export default function CreateMatch() {
       setRequestType('casual_match');
     }
   }, [hasPrivilegedAccess, requestType]);
+
+  useEffect(() => {
+    if (accountMode === 'club' && hasPrivilegedAccess) {
+      setRequestType('club_recruitment');
+    }
+  }, [accountMode, hasPrivilegedAccess]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setClubForm((prev) => ({
+      ...prev,
+      club_name: prev.club_name || profile.club_name || '',
+      city: prev.city || profile.club_city || '',
+      zone: prev.zone || profile.club_zone || '',
+      description: prev.description || profile.club_bio || '',
+    }));
+  }, [profile]);
 
   useEffect(() => {
     const query = (currentAddressQuery || '').trim();
