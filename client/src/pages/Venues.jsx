@@ -22,6 +22,7 @@ export default function Venues() {
   });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [mapsReady, setMapsReady] = useState(false);
   const [detectedLocation, setDetectedLocation] = useState('');
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [detectedCoords, setDetectedCoords] = useState(null);
@@ -77,6 +78,16 @@ export default function Venues() {
   });
 
   const canManageVenues = user && profile?.profile_type === 'venue_member';
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (window.google?.maps?.places?.AutocompleteService) {
+        setMapsReady(true);
+        clearInterval(id);
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     async function fetchVenues() {
@@ -148,10 +159,6 @@ export default function Venues() {
         types: ['geocode'],
         language: 'es',
       };
-      if (detectedCoords) {
-        req.location = new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng);
-        req.radius = 50000;
-      }
 
       const geoPredictions = await getPredictions(service, req);
 
@@ -172,7 +179,7 @@ export default function Venues() {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [form.address, detectedCoords]);
+  }, [form.address, mapsReady]);
 
   return (
     <div className="page-content">

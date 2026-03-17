@@ -38,6 +38,7 @@ export default function CreateMatch() {
   });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [mapsReady, setMapsReady] = useState(false);
   const [detectedLocation, setDetectedLocation] = useState('');
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [detectedCoords, setDetectedCoords] = useState(null);
@@ -94,6 +95,16 @@ export default function CreateMatch() {
   });
 
   useEffect(() => {
+    const id = setInterval(() => {
+      if (window.google?.maps?.places?.AutocompleteService) {
+        setMapsReady(true);
+        clearInterval(id);
+      }
+    }, 250);
+    return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     detectMyLocation();
   }, []);
 
@@ -117,10 +128,6 @@ export default function CreateMatch() {
         types: ['geocode'],
         language: 'es',
       };
-      if (detectedCoords) {
-        req.location = new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng);
-        req.radius = 50000;
-      }
 
       const geoPredictions = await getPredictions(service, req);
 
@@ -144,7 +151,7 @@ export default function CreateMatch() {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [currentAddressQuery, detectedCoords]);
+  }, [currentAddressQuery, mapsReady]);
 
   const useDetectedLocation = () => {
     detectMyLocation();
