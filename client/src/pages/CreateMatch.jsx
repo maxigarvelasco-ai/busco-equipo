@@ -25,6 +25,9 @@ export default function CreateMatch() {
   });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [detectedLocation, setDetectedLocation] = useState('');
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [detectedCoords, setDetectedCoords] = useState(null);
   const currentAddressQuery = requestType === 'casual_match' ? matchForm.venue : tournamentForm.venue;
 
   const getPlacesAutocompleteService = () => {
@@ -34,6 +37,84 @@ export default function CreateMatch() {
     }
     return window.__buscoEquipoPlacesService;
   };
+
+  const getGeocoder = () => {
+    if (!window.google?.maps?.Geocoder) return null;
+    if (!window.__buscoEquipoGeocoder) {
+      window.__buscoEquipoGeocoder = new window.google.maps.Geocoder();
+    }
+    return window.__buscoEquipoGeocoder;
+  };
+
+  const geocode = (request) => {
+    const geocoder = getGeocoder();
+    if (!geocoder) return Promise.resolve([]);
+    return new Promise((resolve) => {
+      geocoder.geocode(request, (results, status) => {
+        const ok = status === 'OK';
+        resolve(ok ? (results || []) : []);
+      });
+    });
+  };
+
+  const pickCityFromComponents = (components = []) => {
+    const byType = (type) => components.find((c) => (c.types || []).includes(type))?.long_name || '';
+    return (
+      byType('locality')
+      || byType('postal_town')
+      || byType('administrative_area_level_2')
+      || byType('administrative_area_level_1')
+      || ''
+    );
+  };
+
+  const resolveAddressMeta = async (addressText) => {
+    const query = (addressText || '').trim();
+    if (!query) return { city: '', address: '' };
+    const results = await geocode({ address: query, language: 'es' });
+    const first = results?.[0];
+    if (!first) return { city: '', address: query };
+    return {
+      city: pickCityFromComponents(first.address_components || []),
+      address: first.formatted_address || query,
+    };
+  };
+
+  const detectMyLocation = async () => {
+    if (!navigator.geolocation) return;
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        setDetectedCoords({ lat: coords.latitude, lng: coords.longitude });
+        const results = await geocode({
+          location: { lat: coords.latitude, lng: coords.longitude },
+          language: 'es',
+        });
+        const first = results?.[0]?.formatted_address || '';
+        setDetectedLocation(first);
+        setDetectingLocation(false);
+      },
+      () => {
+        setDetectingLocation(false);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 8000,
+        maximumAge: 600000,
+      }
+    );
+  };
+
+  const getPredictions = (service, request) => new Promise((resolve) => {
+    service.getPlacePredictions(request, (result, status) => {
+      const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
+      resolve(ok ? (result || []) : []);
+    });
+  });
+
+  useEffect(() => {
+    detectMyLocation();
+  }, []);
 
   useEffect(() => {
     const query = (currentAddressQuery || '').trim();
@@ -50,24 +131,31 @@ export default function CreateMatch() {
         return;
       }
 
-      const predictions = await new Promise((resolve) => {
-        service.getPlacePredictions(
-          {
-            input: query,
-            types: ['address'],
-            componentRestrictions: { country: 'ar' },
-            language: 'es',
-          },
-          (result, status) => {
-            const ok = status === window.google.maps.places.PlacesServiceStatus.OK;
-            resolve(ok ? (result || []) : []);
+      const locationBias = detectedCoords
+        ? {
+            center: new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng),
+            radius: 50000,
           }
-        );
-      });
+        : undefined;
+
+      const [geoPredictions, regionPredictions] = await Promise.all([
+        getPredictions(service, {
+          input: query,
+          types: ['geocode'],
+          language: 'es',
+          locationBias,
+        }),
+        getPredictions(service, {
+          input: query,
+          types: ['(regions)'],
+          language: 'es',
+          locationBias,
+        }),
+      ]);
 
       if (cancelled) return;
       const normalizedQuery = query.toLowerCase();
-      const labels = predictions.map((p) => p.description).filter(Boolean);
+      const labels = [...geoPredictions, ...regionPredictions].map((p) => p.description).filter(Boolean);
       const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
       const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
       const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
@@ -82,12 +170,13 @@ export default function CreateMatch() {
     };
   }, [currentAddressQuery]);
 
-  const extractCityFromAddress = (address) => {
-    const parts = (address || '')
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
-    return parts.length >= 2 ? parts[1] : '';
+  const useDetectedLocation = () => {
+    if (!detectedLocation) return;
+    if (requestType === 'casual_match') {
+      setMatchForm((p) => ({ ...p, venue: detectedLocation }));
+    } else {
+      setTournamentForm((p) => ({ ...p, venue: detectedLocation }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -100,7 +189,8 @@ export default function CreateMatch() {
         if (!matchForm.venue.trim()) {
           throw new Error('Completá la dirección');
         }
-        const inferredCity = extractCityFromAddress(matchForm.venue);
+        const resolved = await resolveAddressMeta(matchForm.venue);
+        const inferredCity = resolved.city;
         if (!inferredCity) {
           throw new Error('Seleccioná una dirección que incluya ciudad');
         }
@@ -108,7 +198,7 @@ export default function CreateMatch() {
           football_type: parseInt(footballType),
           title: `Partido F${footballType}`,
           city: inferredCity,
-          address: matchForm.venue,
+          address: resolved.address || matchForm.venue,
           zone: inferredCity,
           match_date: matchForm.date,
           match_time: matchForm.time,
@@ -124,14 +214,15 @@ export default function CreateMatch() {
         if (!tournamentForm.name.trim()) {
           throw new Error('Completá el nombre del torneo');
         }
+        const tournamentResolved = await resolveAddressMeta(tournamentForm.venue);
         await tournamentsAPI.create({
           name: tournamentForm.name,
           football_type: parseInt(footballType),
           start_date: tournamentForm.start_date,
           max_teams: 2,
           entry_price: 0,
-          city: extractCityFromAddress(tournamentForm.venue) || null,
-          venue_name: tournamentForm.venue || null,
+          city: tournamentResolved.city || null,
+          venue_name: tournamentResolved.address || tournamentForm.venue || null,
           needed_players: parseInt(tournamentForm.needed_players || '1'),
           description: tournamentForm.description || null,
         });
@@ -188,6 +279,14 @@ export default function CreateMatch() {
           <div style={{ display: 'grid', gap: '0.6rem' }}>
             <div className="form-group">
               <label className="form-label">Dirección</label>
+              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                  {detectingLocation ? 'Detectando ubicación...' : (detectedLocation ? `Ubicación detectada: ${detectedLocation}` : 'Ubicación no detectada')}
+                </span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={useDetectedLocation} disabled={!detectedLocation}>
+                  Usar mi ubicación
+                </button>
+              </div>
               <input
                 className="form-input"
                 value={matchForm.venue}
@@ -239,6 +338,14 @@ export default function CreateMatch() {
             </div>
             <div className="form-group">
               <label className="form-label">Dirección o complejo</label>
+              <div style={{ display: 'flex', gap: '0.45rem', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                  {detectingLocation ? 'Detectando ubicación...' : (detectedLocation ? `Ubicación detectada: ${detectedLocation}` : 'Ubicación no detectada')}
+                </span>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={useDetectedLocation} disabled={!detectedLocation}>
+                  Usar mi ubicación
+                </button>
+              </div>
               <input
                 className="form-input"
                 value={tournamentForm.venue}
