@@ -198,7 +198,7 @@ export default function Feed() {
         age_restricted: !!m.age_restricted,
         min_age: m.min_age ?? null,
         max_age: m.max_age ?? null,
-        goalkeepers_needed: m.goalkeepers_needed || 1,
+        goalkeepers_needed: m.goalkeepers_needed ?? 0,
       };
     });
 

@@ -206,6 +206,14 @@ export default function CreateMatch() {
     }
   };
 
+  const isAddressValid = (address) => {
+    const text = String(address || '').trim();
+    if (!text) return false;
+    const hasStreetNumber = /\b\d{1,5}\b/.test(text);
+    const looksLikeCorner = /\b(esquina|esq\.?| y |&| esquina de )\b/i.test(text);
+    return hasStreetNumber || looksLikeCorner;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -216,10 +224,13 @@ export default function CreateMatch() {
         if (!matchForm.venue.trim()) {
           throw new Error('Completá la dirección');
         }
+        if (!isAddressValid(matchForm.venue)) {
+          throw new Error('Ingresá una dirección con altura o una esquina');
+        }
         if (matchForm.age_restricted && parseInt(matchForm.min_age || '0') > parseInt(matchForm.max_age || '0')) {
           throw new Error('El rango de edad no es válido');
         }
-        const resolved = await resolveAddressMeta(matchForm.venue);
+        const resolved = await resolveAddressMeta(matchForm.venue, matchForm.inferred_place_id || null);
         const inferredCity = matchForm.inferred_city || resolved.city || 'Sin ciudad';
         await matchesAPI.create({
           football_type: parseInt(footballType),
@@ -248,10 +259,13 @@ export default function CreateMatch() {
         if (!tournamentForm.name.trim()) {
           throw new Error('Completá el nombre del torneo');
         }
+        if (!isAddressValid(tournamentForm.venue)) {
+          throw new Error('Ingresá una dirección con altura o una esquina');
+        }
         if (tournamentForm.age_restricted && parseInt(tournamentForm.min_age || '0') > parseInt(tournamentForm.max_age || '0')) {
           throw new Error('El rango de edad no es válido');
         }
-        const tournamentResolved = await resolveAddressMeta(tournamentForm.venue);
+        const tournamentResolved = await resolveAddressMeta(tournamentForm.venue, tournamentForm.inferred_place_id || null);
         await tournamentsAPI.create({
           name: tournamentForm.name,
           football_type: parseInt(footballType),
