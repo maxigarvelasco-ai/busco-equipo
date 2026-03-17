@@ -8,7 +8,7 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [age, setAge] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState('masculino');
   const [profileType, setProfileType] = useState('normal');
   const [error, setError] = useState('');
@@ -24,11 +24,15 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const parsedAge = parseInt(age);
-      if (!parsedAge || parsedAge < 13 || parsedAge > 90) {
-        throw new Error('Ingresá una edad válida entre 13 y 90');
+      const birth = new Date(birthDate);
+      if (Number.isNaN(birth.getTime())) {
+        throw new Error('Ingresá una fecha de nacimiento válida');
       }
-      const data = await register(name, email, password, profileType, parsedAge, gender);
+      const years = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      if (years < 13 || years > 90) {
+        throw new Error('La fecha de nacimiento debe dar una edad entre 13 y 90 años');
+      }
+      const data = await register(name, email, password, profileType, birthDate, gender);
       // Supabase may require email confirmation
       if (data?.user && !data.session) {
         setSuccess(true);
@@ -113,14 +117,12 @@ export default function Register() {
           </div>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Edad</label>
+              <label className="form-label">Fecha de nacimiento</label>
               <input
-                type="number"
+                type="date"
                 className="form-input"
-                min="13"
-                max="90"
-                value={age}
-                onChange={e => setAge(e.target.value)}
+                value={birthDate}
+                onChange={e => setBirthDate(e.target.value)}
                 required
               />
             </div>

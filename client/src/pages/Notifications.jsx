@@ -62,7 +62,26 @@ export default function Notifications() {
               raw: parsed,
             };
             const newNotif = { ...n, data: parsed, parsedData };
-            setNotifications(prev => [newNotif, ...prev]);
+            setNotifications(prev => {
+              const reqId = parsedData.requestId;
+              if (!reqId) return [newNotif, ...prev];
+
+              const existingIdx = prev.findIndex((x) => {
+                const d = x?.parsedData || {};
+                return d.requestId && String(d.requestId) === String(reqId);
+              });
+
+              if (existingIdx === -1) return [newNotif, ...prev];
+
+              const existing = prev[existingIdx];
+              const score = /ten[eé]s una nueva solicitud de/i.test(String(newNotif.message || '')) ? 2 : 1;
+              const existingScore = /ten[eé]s una nueva solicitud de/i.test(String(existing.message || '')) ? 2 : 1;
+              if (score <= existingScore) return prev;
+
+              const next = [...prev];
+              next.splice(existingIdx, 1);
+              return [newNotif, ...next];
+            });
           })
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, (payload) => {
             const n = payload.new || payload.record || null;

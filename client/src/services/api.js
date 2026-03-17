@@ -474,11 +474,17 @@ export const profilesAPI = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
 
+    const birth = new Date(profileData.birth_date || '');
+    const computedAge = Number.isNaN(birth.getTime())
+      ? (profileData.age ? parseInt(profileData.age) : null)
+      : Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+
     const payload = {
       name: profileData.name,
+      birth_date: profileData.birth_date || null,
       city: profileData.city || null,
       zone: profileData.zone || null,
-      age: profileData.age ? parseInt(profileData.age) : null,
+      age: computedAge,
       gender: profileData.gender || null,
       preferred_position: profileData.preferred_position || null,
       preferred_foot: profileData.preferred_foot || null,
@@ -766,7 +772,31 @@ export const notificationsAPI = {
       .eq('user_id', session.user.id)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+
+    const rows = data || [];
+    const keyOf = (n) => {
+      const d = n?.data;
+      if (!d || typeof d !== 'object') return null;
+      return d.requestId || d.request_id || null;
+    };
+
+    const bestByRequest = new Map();
+    for (const n of rows) {
+      const reqId = keyOf(n);
+      if (!reqId) continue;
+      const prev = bestByRequest.get(reqId);
+      const score = /ten[eé]s una nueva solicitud de/i.test(String(n.message || '')) ? 2 : 1;
+      const prevScore = prev ? (/ten[eé]s una nueva solicitud de/i.test(String(prev.message || '')) ? 2 : 1) : -1;
+      if (!prev || score > prevScore) {
+        bestByRequest.set(reqId, n);
+      }
+    }
+
+    return rows.filter((n) => {
+      const reqId = keyOf(n);
+      if (!reqId) return true;
+      return bestByRequest.get(reqId)?.id === n.id;
+    });
   },
 
   async markAsRead(notificationId) {

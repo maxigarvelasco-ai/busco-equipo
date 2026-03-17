@@ -33,7 +33,7 @@ function AppRoutes() {
   const location = useLocation();
 
   const needsProfileCompletion = Boolean(
-    user && (!profile?.age || !profile?.gender || !profile?.profile_type)
+    user && (!profile?.birth_date || !profile?.gender || !profile?.profile_type)
   );
   
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;

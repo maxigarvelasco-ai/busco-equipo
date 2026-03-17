@@ -106,12 +106,15 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const register = async (name, email, password, profileType = 'normal', age = null, gender = null) => {
+  const register = async (name, email, password, profileType = 'normal', birthDate = null, gender = null) => {
+    const computedAge = birthDate
+      ? Math.max(0, Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000)))
+      : null;
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name, profile_type: profileType, age, gender },
+        data: { name, profile_type: profileType, birth_date: birthDate, age: computedAge, gender },
       },
     });
     if (error) throw error;
@@ -121,7 +124,7 @@ export function AuthProvider({ children }) {
         await supabase
           .from('profiles')
           .upsert(
-            { id: data.user.id, name, profile_type: profileType, age, gender },
+            { id: data.user.id, name, profile_type: profileType, birth_date: birthDate, age: computedAge, gender },
             { onConflict: 'id' }
           );
       } catch {

@@ -36,6 +36,12 @@ function formatWhen(date, time) {
   return hhmm ? `${baseDate.toLocaleDateString('es-AR')} ${hhmm}` : baseDate.toLocaleDateString('es-AR');
 }
 
+function computeAgeFromBirthDate(birthDate) {
+  const d = new Date(birthDate || '');
+  if (Number.isNaN(d.getTime())) return null;
+  return Math.floor((Date.now() - d.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+}
+
 function countryAbbrFromText(raw) {
   const text = String(raw || '').trim();
   if (!text) return '';
@@ -103,7 +109,7 @@ function matchesProfileRestrictions(item, profile) {
   const minAge = item.min_age ?? null;
   const maxAge = item.max_age ?? null;
   const userGender = profile?.gender || null;
-  const userAge = profile?.age ?? null;
+  const userAge = computeAgeFromBirthDate(profile?.birth_date) ?? profile?.age ?? null;
 
   if (requiredGender !== 'mixto') {
     if (!userGender) return false;

@@ -136,7 +136,7 @@ a:hover { color: var(--color-primary-light); }
 .page-content {
   flex: 1;
   padding: clamp(0.9rem, 2vw, 1.3rem);
-  padding-bottom: calc(var(--nav-height) + var(--space-xl));
+  padding-bottom: calc(var(--nav-height) + var(--space-3xl) + env(safe-area-inset-bottom, 0px) + 28px);
   max-width: var(--max-width);
   margin: 0 auto;
   width: 100%;
@@ -505,6 +505,12 @@ a:hover { color: var(--color-primary-light); }
 
 .top-header-logo span {
   color: var(--color-primary);
+}
+
+.top-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 /* ===== Area Filter ===== */
@@ -912,6 +918,14 @@ a:hover { color: var(--color-primary-light); }
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-md);
   margin-top: var(--space-xl);
+}
+
+.profile-actions {
+  margin-top: var(--space-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin-bottom: calc(var(--nav-height) + 20px);
 }
 
 .stat-card {

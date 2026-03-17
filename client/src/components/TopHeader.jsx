@@ -5,7 +5,7 @@ import { notificationsAPI } from '../services/api';
 
 export default function TopHeader() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
@@ -35,37 +35,63 @@ export default function TopHeader() {
       <div className="top-header-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer', margin: 0 }}>
         ⚽ Busco<span>Equipo</span>
       </div>
-      <button
-        type="button"
-        className="btn btn-secondary btn-sm"
-        style={{ minWidth: 44, height: 36, position: 'relative', padding: '0 0.7rem' }}
-        onClick={() => navigate(user ? '/notifications' : '/login')}
-        aria-label="Notificaciones"
-      >
-        🔔
-        {user && unreadCount > 0 && (
-          <span
-            style={{
-              position: 'absolute',
-              top: -6,
-              right: -6,
-              minWidth: 18,
-              height: 18,
-              borderRadius: 999,
-              fontSize: 11,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--color-danger)',
-              color: '#fff',
-              border: '2px solid var(--color-bg)',
-            }}
+      <div className="top-header-actions">
+        {user && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => navigate('/create-match')}
+            aria-label="Crear partido"
           >
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+            +
+          </button>
         )}
-      </button>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ minWidth: 44, height: 36, position: 'relative', padding: '0 0.7rem' }}
+          onClick={() => navigate(user ? '/notifications' : '/login')}
+          aria-label="Notificaciones"
+        >
+          🔔
+          {user && unreadCount > 0 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                minWidth: 18,
+                height: 18,
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'var(--color-danger)',
+                color: '#fff',
+                border: '2px solid var(--color-bg)',
+              }}
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+        {user && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={async () => {
+              await logout();
+              navigate('/login');
+            }}
+            aria-label="Cerrar sesión"
+            title="Cerrar sesión"
+          >
+            Salir
+          </button>
+        )}
+      </div>
     </header>
   );
 }

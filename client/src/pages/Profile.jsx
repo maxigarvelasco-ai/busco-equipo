@@ -16,7 +16,7 @@ export default function Profile() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
-    age: '',
+    birth_date: '',
     gender: 'masculino',
     city: '',
     zone: '',
@@ -35,7 +35,7 @@ export default function Profile() {
     if (!profile) return;
     setEditForm({
       name: profile.name || '',
-      age: profile.age || '',
+      birth_date: profile.birth_date || '',
       gender: profile.gender || 'masculino',
       city: profile.city || '',
       zone: profile.zone || '',
@@ -69,9 +69,19 @@ export default function Profile() {
     setSaveMsg('');
     setSaving(true);
     try {
+      const birth = new Date(editForm.birth_date);
+      if (Number.isNaN(birth.getTime())) {
+        throw new Error('Ingresá una fecha de nacimiento válida');
+      }
+      const computedAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+      if (computedAge < 13 || computedAge > 90) {
+        throw new Error('La fecha de nacimiento debe dar una edad entre 13 y 90 años');
+      }
+
       const updates = {
         name: editForm.name,
-        age: editForm.age ? parseInt(editForm.age) : null,
+        birth_date: editForm.birth_date || null,
+        age: computedAge,
         gender: editForm.gender || null,
         city: editForm.city || null,
         zone: editForm.zone || null,
@@ -154,8 +164,8 @@ export default function Profile() {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Edad</label>
-              <input type="number" min="13" max="90" className="form-input" value={editForm.age} onChange={(e) => setEditForm((p) => ({ ...p, age: e.target.value }))} required />
+              <label className="form-label">Fecha de nacimiento</label>
+              <input type="date" className="form-input" value={editForm.birth_date} onChange={(e) => setEditForm((p) => ({ ...p, birth_date: e.target.value }))} required />
             </div>
             <div className="form-group">
               <label className="form-label">Sexo</label>
@@ -216,7 +226,7 @@ export default function Profile() {
         </form>
       </div>
 
-      <div style={{ marginTop: 'var(--space-2xl)', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+      <div className="profile-actions">
         {!isPro && (
           <button className="btn btn-gold btn-lg btn-full" onClick={() => navigate('/subscription')}>
             ⭐ Hacerme Pro

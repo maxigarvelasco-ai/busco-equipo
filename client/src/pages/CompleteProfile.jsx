@@ -6,7 +6,7 @@ import { supabase } from '../services/supabaseClient';
 export default function CompleteProfile() {
   const { user, profile, fetchProfile } = useAuth();
   const navigate = useNavigate();
-  const [age, setAge] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState('masculino');
   const [profileType, setProfileType] = useState('normal');
   const [saving, setSaving] = useState(false);
@@ -14,7 +14,7 @@ export default function CompleteProfile() {
 
   useEffect(() => {
     if (!profile) return;
-    setAge(profile.age || '');
+    setBirthDate(profile.birth_date || '');
     setGender(profile.gender || 'masculino');
     setProfileType(profile.profile_type || 'normal');
   }, [profile]);
@@ -23,15 +23,21 @@ export default function CompleteProfile() {
     e.preventDefault();
     setError('');
 
-    const parsedAge = parseInt(age);
-    if (!parsedAge || parsedAge < 13 || parsedAge > 90) {
-      setError('Ingresá una edad válida entre 13 y 90');
+    const birth = new Date(birthDate);
+    if (Number.isNaN(birth.getTime())) {
+      setError('Ingresá una fecha de nacimiento válida');
+      return;
+    }
+    const parsedAge = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    if (parsedAge < 13 || parsedAge > 90) {
+      setError('La fecha de nacimiento debe dar una edad entre 13 y 90 años');
       return;
     }
 
     setSaving(true);
     try {
       const payload = {
+        birth_date: birthDate,
         age: parsedAge,
         gender,
         profile_type: profileType,
@@ -52,6 +58,7 @@ export default function CompleteProfile() {
           .insert({
             id: user.id,
             name: profile?.name || user.user_metadata?.name || user.email?.split('@')[0] || 'Usuario',
+            birth_date: birthDate,
             age: parsedAge,
             gender,
             profile_type: profileType,
@@ -61,6 +68,7 @@ export default function CompleteProfile() {
 
       await supabase.auth.updateUser({
         data: {
+          birth_date: birthDate,
           age: parsedAge,
           gender,
           profile_type: profileType,
@@ -88,14 +96,12 @@ export default function CompleteProfile() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Edad</label>
+            <label className="form-label">Fecha de nacimiento</label>
             <input
-              type="number"
+              type="date"
               className="form-input"
-              min="13"
-              max="90"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
+              value={birthDate}
+              onChange={(e) => setBirthDate(e.target.value)}
               required
             />
           </div>
