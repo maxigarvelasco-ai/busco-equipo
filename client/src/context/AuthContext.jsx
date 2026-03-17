@@ -106,12 +106,12 @@ export function AuthProvider({ children }) {
     return data;
   };
 
-  const register = async (name, email, password, profileType = 'normal') => {
+  const register = async (name, email, password, profileType = 'normal', age = null, gender = null) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { name, profile_type: profileType },
+        data: { name, profile_type: profileType, age, gender },
       },
     });
     if (error) throw error;
@@ -121,7 +121,7 @@ export function AuthProvider({ children }) {
         await supabase
           .from('profiles')
           .upsert(
-            { id: data.user.id, name, profile_type: profileType },
+            { id: data.user.id, name, profile_type: profileType, age, gender },
             { onConflict: 'id' }
           );
       } catch {

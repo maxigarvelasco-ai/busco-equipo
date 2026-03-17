@@ -16,6 +16,8 @@ export default function Profile() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [editForm, setEditForm] = useState({
     name: '',
+    age: '',
+    gender: 'masculino',
     city: '',
     zone: '',
     preferred_position: '',
@@ -33,6 +35,8 @@ export default function Profile() {
     if (!profile) return;
     setEditForm({
       name: profile.name || '',
+      age: profile.age || '',
+      gender: profile.gender || 'masculino',
       city: profile.city || '',
       zone: profile.zone || '',
       preferred_position: profile.preferred_position || '',
@@ -67,6 +71,8 @@ export default function Profile() {
     try {
       const updates = {
         name: editForm.name,
+        age: editForm.age ? parseInt(editForm.age) : null,
+        gender: editForm.gender || null,
         city: editForm.city || null,
         zone: editForm.zone || null,
         preferred_position: editForm.preferred_position || null,
@@ -143,6 +149,20 @@ export default function Profile() {
             <div className="form-group">
               <label className="form-label">Nombre</label>
               <input className="form-input" value={editForm.name} onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))} required />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Edad</label>
+              <input type="number" min="13" max="90" className="form-input" value={editForm.age} onChange={(e) => setEditForm((p) => ({ ...p, age: e.target.value }))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Sexo</label>
+              <select className="form-select" value={editForm.gender} onChange={(e) => setEditForm((p) => ({ ...p, gender: e.target.value }))} required>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
             </div>
           </div>
 

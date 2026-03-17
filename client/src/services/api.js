@@ -122,6 +122,11 @@ export const matchesAPI = {
       requires_approval: typeof matchData.requires_approval === 'boolean' ? matchData.requires_approval : true,
       allow_waitlist: typeof matchData.allow_waitlist === 'boolean' ? matchData.allow_waitlist : true,
       price_per_player: matchData.price_per_player || 0,
+      match_gender: matchData.match_gender || 'mixto',
+      age_restricted: !!matchData.age_restricted,
+      min_age: matchData.age_restricted ? (matchData.min_age ?? null) : null,
+      max_age: matchData.age_restricted ? (matchData.max_age ?? null) : null,
+      goalkeepers_needed: matchData.goalkeepers_needed ? parseInt(matchData.goalkeepers_needed) : 1,
       description: matchData.description || null,
     };
 
@@ -471,6 +476,8 @@ export const profilesAPI = {
       name: profileData.name,
       city: profileData.city || null,
       zone: profileData.zone || null,
+      age: profileData.age ? parseInt(profileData.age) : null,
+      gender: profileData.gender || null,
       preferred_position: profileData.preferred_position || null,
       preferred_foot: profileData.preferred_foot || null,
       skill_level: profileData.skill_level ? parseInt(profileData.skill_level) : null,
@@ -645,6 +652,10 @@ export const tournamentsAPI = {
       zone: tournamentData.city || null,
       venue_name: tournamentData.venue_name || null,
       needed_players: tournamentData.needed_players ? parseInt(tournamentData.needed_players) : 1,
+      match_gender: tournamentData.match_gender || 'mixto',
+      age_restricted: !!tournamentData.age_restricted,
+      min_age: tournamentData.age_restricted ? (tournamentData.min_age ?? null) : null,
+      max_age: tournamentData.age_restricted ? (tournamentData.max_age ?? null) : null,
       visibility: 'public',
     };
 

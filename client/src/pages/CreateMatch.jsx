@@ -14,6 +14,11 @@ export default function CreateMatch() {
     date: new Date().toISOString().split('T')[0],
     time: '21:00',
     needed_players: '3',
+    match_gender: 'mixto',
+    age_restricted: false,
+    min_age: '18',
+    max_age: '25',
+    goalkeepers_needed: '1',
     description: '',
   });
   const [tournamentForm, setTournamentForm] = useState({
@@ -21,6 +26,10 @@ export default function CreateMatch() {
     venue: '',
     start_date: new Date().toISOString().split('T')[0],
     needed_players: '2',
+    match_gender: 'mixto',
+    age_restricted: false,
+    min_age: '18',
+    max_age: '25',
     description: '',
   });
   const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -70,13 +79,15 @@ export default function CreateMatch() {
 
   const resolveAddressMeta = async (addressText) => {
     const query = (addressText || '').trim();
-    if (!query) return { city: '', address: '' };
+    if (!query) return { city: '', address: '', latitude: null, longitude: null };
     const results = await geocode({ address: query, language: 'es' });
     const first = results?.[0];
-    if (!first) return { city: '', address: query };
+    if (!first) return { city: '', address: query, latitude: null, longitude: null };
     return {
       city: pickCityFromComponents(first.address_components || []),
       address: first.formatted_address || query,
+      latitude: first.geometry?.location?.lat?.() ?? null,
+      longitude: first.geometry?.location?.lng?.() ?? null,
     };
   };
 
@@ -168,7 +179,7 @@ export default function CreateMatch() {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [currentAddressQuery]);
+  }, [currentAddressQuery, detectedCoords]);
 
   const useDetectedLocation = () => {
     if (!detectedLocation) return;
@@ -189,6 +200,9 @@ export default function CreateMatch() {
         if (!matchForm.venue.trim()) {
           throw new Error('Completá la dirección');
         }
+        if (matchForm.age_restricted && parseInt(matchForm.min_age || '0') > parseInt(matchForm.max_age || '0')) {
+          throw new Error('El rango de edad no es válido');
+        }
         const resolved = await resolveAddressMeta(matchForm.venue);
         const inferredCity = resolved.city;
         if (!inferredCity) {
@@ -199,10 +213,17 @@ export default function CreateMatch() {
           title: `Partido F${footballType}`,
           city: inferredCity,
           address: resolved.address || matchForm.venue,
+          latitude: resolved.latitude,
+          longitude: resolved.longitude,
           zone: inferredCity,
           match_date: matchForm.date,
           match_time: matchForm.time,
           max_players: Math.max(parseInt(matchForm.needed_players || '1') + 1, 2),
+          match_gender: matchForm.match_gender,
+          age_restricted: !!matchForm.age_restricted,
+          min_age: matchForm.age_restricted ? parseInt(matchForm.min_age || '0') : null,
+          max_age: matchForm.age_restricted ? parseInt(matchForm.max_age || '0') : null,
+          goalkeepers_needed: parseInt(matchForm.goalkeepers_needed || '1'),
           match_kind: 'recreativo',
           visibility: 'public',
           requires_approval: true,
@@ -214,6 +235,9 @@ export default function CreateMatch() {
         if (!tournamentForm.name.trim()) {
           throw new Error('Completá el nombre del torneo');
         }
+        if (tournamentForm.age_restricted && parseInt(tournamentForm.min_age || '0') > parseInt(tournamentForm.max_age || '0')) {
+          throw new Error('El rango de edad no es válido');
+        }
         const tournamentResolved = await resolveAddressMeta(tournamentForm.venue);
         await tournamentsAPI.create({
           name: tournamentForm.name,
@@ -223,6 +247,10 @@ export default function CreateMatch() {
           entry_price: 0,
           city: tournamentResolved.city || null,
           venue_name: tournamentResolved.address || tournamentForm.venue || null,
+          match_gender: tournamentForm.match_gender,
+          age_restricted: !!tournamentForm.age_restricted,
+          min_age: tournamentForm.age_restricted ? parseInt(tournamentForm.min_age || '0') : null,
+          max_age: tournamentForm.age_restricted ? parseInt(tournamentForm.max_age || '0') : null,
           needed_players: parseInt(tournamentForm.needed_players || '1'),
           description: tournamentForm.description || null,
         });
@@ -325,6 +353,41 @@ export default function CreateMatch() {
               <label className="form-label">Jugadores necesarios</label>
               <input type="number" className="form-input" min="1" max="30" value={matchForm.needed_players} onChange={(e) => setMatchForm((p) => ({ ...p, needed_players: e.target.value }))} required />
             </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Sexo del partido</label>
+                <select className="form-select" value={matchForm.match_gender} onChange={(e) => setMatchForm((p) => ({ ...p, match_gender: e.target.value }))}>
+                  <option value="masculino">Masculino</option>
+                  <option value="femenino">Femenino</option>
+                  <option value="mixto">Mixto</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Arqueros necesarios</label>
+                <select className="form-select" value={matchForm.goalkeepers_needed} onChange={(e) => setMatchForm((p) => ({ ...p, goalkeepers_needed: e.target.value }))}>
+                  <option value="1">1 arquero</option>
+                  <option value="2">2 arqueros</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-group" style={{ marginTop: '-0.2rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input type="checkbox" checked={matchForm.age_restricted} onChange={(e) => setMatchForm((p) => ({ ...p, age_restricted: e.target.checked }))} />
+                Restringir por edad
+              </label>
+            </div>
+            {matchForm.age_restricted && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Edad mínima</label>
+                  <input type="number" className="form-input" min="13" max="90" value={matchForm.min_age} onChange={(e) => setMatchForm((p) => ({ ...p, min_age: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Edad máxima</label>
+                  <input type="number" className="form-input" min="13" max="90" value={matchForm.max_age} onChange={(e) => setMatchForm((p) => ({ ...p, max_age: e.target.value }))} required />
+                </div>
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label">Descripcion</label>
               <textarea className="form-textarea" value={matchForm.description} onChange={(e) => setMatchForm((p) => ({ ...p, description: e.target.value }))} />
@@ -379,6 +442,32 @@ export default function CreateMatch() {
                 <input type="number" className="form-input" min="1" max="30" value={tournamentForm.needed_players} onChange={(e) => setTournamentForm((p) => ({ ...p, needed_players: e.target.value }))} required />
               </div>
             </div>
+            <div className="form-group">
+              <label className="form-label">Sexo del torneo</label>
+              <select className="form-select" value={tournamentForm.match_gender} onChange={(e) => setTournamentForm((p) => ({ ...p, match_gender: e.target.value }))}>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+                <option value="mixto">Mixto</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginTop: '-0.2rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input type="checkbox" checked={tournamentForm.age_restricted} onChange={(e) => setTournamentForm((p) => ({ ...p, age_restricted: e.target.checked }))} />
+                Restringir por edad
+              </label>
+            </div>
+            {tournamentForm.age_restricted && (
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Edad mínima</label>
+                  <input type="number" className="form-input" min="13" max="90" value={tournamentForm.min_age} onChange={(e) => setTournamentForm((p) => ({ ...p, min_age: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Edad máxima</label>
+                  <input type="number" className="form-input" min="13" max="90" value={tournamentForm.max_age} onChange={(e) => setTournamentForm((p) => ({ ...p, max_age: e.target.value }))} required />
+                </div>
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label">Descripcion</label>
               <textarea className="form-textarea" value={tournamentForm.description} onChange={(e) => setTournamentForm((p) => ({ ...p, description: e.target.value }))} />

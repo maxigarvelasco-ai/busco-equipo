@@ -8,6 +8,8 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [age, setAge] = useState('');
+  const [gender, setGender] = useState('masculino');
   const [profileType, setProfileType] = useState('normal');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -22,7 +24,11 @@ export default function Register() {
     }
     setLoading(true);
     try {
-      const data = await register(name, email, password, profileType);
+      const parsedAge = parseInt(age);
+      if (!parsedAge || parsedAge < 13 || parsedAge > 90) {
+        throw new Error('Ingresá una edad válida entre 13 y 90');
+      }
+      const data = await register(name, email, password, profileType, parsedAge, gender);
       // Supabase may require email confirmation
       if (data?.user && !data.session) {
         setSuccess(true);
@@ -104,6 +110,27 @@ export default function Register() {
               required
               minLength={6}
             />
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Edad</label>
+              <input
+                type="number"
+                className="form-input"
+                min="13"
+                max="90"
+                value={age}
+                onChange={e => setAge(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Sexo</label>
+              <select className="form-select" value={gender} onChange={(e) => setGender(e.target.value)} required>
+                <option value="masculino">Masculino</option>
+                <option value="femenino">Femenino</option>
+              </select>
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Tipo de perfil</label>
