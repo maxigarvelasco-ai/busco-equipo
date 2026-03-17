@@ -207,6 +207,7 @@ export default function Profile() {
   const hasClubAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'club' && r.status === 'approved');
   const hasVenueAccess = isReviewer || (roleRequests || []).some((r) => r.desired_role === 'venue_member' && r.status === 'approved');
   const isOrgMode = profileViewMode !== 'normal';
+  const profileIdentityName = profile?.name || profile?.nickname || (String(user?.email || '').split('@')[0]) || '-';
   const activeName = profileViewMode === 'club'
     ? (profile?.club_name || '-')
     : (profileViewMode === 'venue' ? (profile?.venue_name || '-') : (profile?.name || '-'));
@@ -304,7 +305,7 @@ export default function Profile() {
         ) : (
           <div className="profile-avatar">{initial}</div>
         )}
-        <div className="profile-name">{profile.name}</div>
+        <div className="profile-name">{profileIdentityName}</div>
         <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
           {user.email}
         </div>
@@ -336,6 +337,47 @@ export default function Profile() {
       </div>
 
       <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
+        <h3 style={{ marginBottom: '0.8rem' }}>Cuenta activa</h3>
+        <p style={{ color: 'var(--color-text-muted)', marginBottom: '0.8rem' }}>
+          Elegí con qué tipo de cuenta querés ver y editar tu perfil ahora.
+        </p>
+        <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={`btn ${profileViewMode === 'normal' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setProfileViewMode('normal');
+              setAccountMode('normal');
+            }}
+          >
+            Jugador
+          </button>
+          <button
+            type="button"
+            className={`btn ${profileViewMode === 'club' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setProfileViewMode('club');
+              setAccountMode('club');
+            }}
+            disabled={!hasClubAccess}
+          >
+            Club
+          </button>
+          <button
+            type="button"
+            className={`btn ${profileViewMode === 'venue' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => {
+              setProfileViewMode('venue');
+              setAccountMode('venue');
+            }}
+            disabled={!hasVenueAccess}
+          >
+            Dueño de cancha
+          </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--space-xl)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.8rem' }}>
           <h3>{profileViewLabel}</h3>
           {!isEditingFicha ? (
@@ -348,43 +390,6 @@ export default function Profile() {
             </button>
           )}
         </div>
-
-        {(hasClubAccess || hasVenueAccess) && (
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', marginBottom: '0.8rem' }}>
-            <button
-              type="button"
-              className={`btn btn-sm ${profileViewMode === 'normal' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => {
-                setProfileViewMode('normal');
-                setAccountMode('normal');
-              }}
-            >
-              Ver como normal
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${profileViewMode === 'club' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => {
-                setProfileViewMode('club');
-                setAccountMode('club');
-              }}
-              disabled={!hasClubAccess}
-            >
-              Ver como club
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${profileViewMode === 'venue' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => {
-                setProfileViewMode('venue');
-                setAccountMode('venue');
-              }}
-              disabled={!hasVenueAccess}
-            >
-              Ver como cancha
-            </button>
-          </div>
-        )}
 
         {!isEditingFicha ? (
           <div style={{ display: 'grid', gap: '0.6rem' }}>

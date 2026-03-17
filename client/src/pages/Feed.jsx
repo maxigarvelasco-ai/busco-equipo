@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { clubsAPI, matchesAPI, roleRequestsAPI, tournamentsAPI } from '../services/api';
+import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 const FOOTBALL_TYPES = [
@@ -133,7 +133,7 @@ function matchesProfileRestrictions(item, profile) {
 }
 
 export default function Feed() {
-  const { user, profile, accountMode, setAccountMode } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -145,8 +145,6 @@ export default function Feed() {
   const [selectedGender, setSelectedGender] = useState('Todos');
   const [toast, setToast] = useState(null);
   const [coords, setCoords] = useState(null);
-  const [hasClubAccess, setHasClubAccess] = useState(false);
-  const [hasVenueAccess, setHasVenueAccess] = useState(false);
 
   const loadMatches = useCallback(async (showSpinner = false) => {
     try {
@@ -192,31 +190,6 @@ export default function Feed() {
       { enableHighAccuracy: false, timeout: 7000, maximumAge: 300000 }
     );
   }, []);
-
-  useEffect(() => {
-    async function loadAccess() {
-      if (!user) {
-        setHasClubAccess(false);
-        setHasVenueAccess(false);
-        return;
-      }
-      try {
-        const isReviewer = String(user.email || '').toLowerCase() === 'maximiliano.g.velasco@gmail.com';
-        if (isReviewer) {
-          setHasClubAccess(true);
-          setHasVenueAccess(true);
-          return;
-        }
-        const requests = await roleRequestsAPI.getMine();
-        setHasClubAccess((requests || []).some((r) => r.status === 'approved' && r.desired_role === 'club'));
-        setHasVenueAccess((requests || []).some((r) => r.status === 'approved' && r.desired_role === 'venue_member'));
-      } catch {
-        setHasClubAccess(false);
-        setHasVenueAccess(false);
-      }
-    }
-    loadAccess();
-  }, [user]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -403,48 +376,6 @@ export default function Feed() {
       <div className="page-header">
         <h1 className="page-title">Solicitudes de futbol</h1>
       </div>
-
-      {user && (
-        <div className="card" style={{ marginBottom: '0.8rem' }}>
-          <div style={{ fontWeight: 700, marginBottom: '0.55rem' }}>Cuenta activa</div>
-          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className={`btn ${accountMode === 'normal' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setAccountMode('normal')}
-            >
-              Jugador
-            </button>
-            <button
-              type="button"
-              className={`btn ${accountMode === 'club' ? 'btn-primary' : 'btn-secondary'}`}
-              disabled={!hasClubAccess}
-              onClick={() => {
-                if (!hasClubAccess) return;
-                setAccountMode('club');
-              }}
-            >
-              Club
-            </button>
-            <button
-              type="button"
-              className={`btn ${accountMode === 'venue' ? 'btn-primary' : 'btn-secondary'}`}
-              disabled={!hasVenueAccess}
-              onClick={() => {
-                if (!hasVenueAccess) return;
-                setAccountMode('venue');
-              }}
-            >
-              Dueño de cancha
-            </button>
-          </div>
-          {(!hasClubAccess || !hasVenueAccess) && (
-            <p style={{ color: 'var(--color-text-muted)', marginTop: '0.55rem', marginBottom: 0 }}>
-              Los modos especiales se habilitan desde Perfil {'>'} Accesos especiales.
-            </p>
-          )}
-        </div>
-      )}
 
       <div className="area-filter">
         {FOOTBALL_TYPES.map((type) => (
