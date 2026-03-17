@@ -16,6 +16,7 @@ export default function Venues() {
   const [form, setForm] = useState({
     name: '',
     address: '',
+    inferred_city: '',
     football_types: [],
     services: [],
   });
@@ -33,60 +34,28 @@ export default function Venues() {
     return window.__buscoEquipoPlacesService;
   };
 
-  const getGeocoder = () => {
-    if (!window.google?.maps?.Geocoder) return null;
-    if (!window.__buscoEquipoGeocoder) {
-      window.__buscoEquipoGeocoder = new window.google.maps.Geocoder();
-    }
-    return window.__buscoEquipoGeocoder;
+  const inferCityFromPrediction = (prediction) => {
+    const terms = prediction?.terms || [];
+    if (terms.length >= 2) return terms[1]?.value || '';
+    const secondary = prediction?.structured_formatting?.secondary_text || '';
+    return secondary ? secondary.split(',')[0].trim() : '';
   };
 
-  const geocode = (request) => {
-    const geocoder = getGeocoder();
-    if (!geocoder) return Promise.resolve([]);
-    return new Promise((resolve) => {
-      geocoder.geocode(request, (results, status) => {
-        const ok = status === 'OK';
-        resolve(ok ? (results || []) : []);
-      });
-    });
-  };
-
-  const pickCityFromComponents = (components = []) => {
-    const byType = (type) => components.find((c) => (c.types || []).includes(type))?.long_name || '';
-    return (
-      byType('locality')
-      || byType('postal_town')
-      || byType('administrative_area_level_2')
-      || byType('administrative_area_level_1')
-      || ''
-    );
-  };
-
-  const resolveAddressMeta = async (addressText) => {
-    const query = (addressText || '').trim();
-    if (!query) return { city: '', address: '' };
-    const results = await geocode({ address: query, language: 'es' });
-    const first = results?.[0];
-    if (!first) return { city: '', address: query };
-    return {
-      city: pickCityFromComponents(first.address_components || []),
-      address: first.formatted_address || query,
-    };
+  const inferCityFromText = (address) => {
+    const parts = String(address || '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return parts.length >= 2 ? parts[1] : '';
   };
 
   const detectMyLocation = async () => {
     if (!navigator.geolocation) return;
     setDetectingLocation(true);
     navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
+      ({ coords }) => {
         setDetectedCoords({ lat: coords.latitude, lng: coords.longitude });
-        const results = await geocode({
-          location: { lat: coords.latitude, lng: coords.longitude },
-          language: 'es',
-        });
-        const first = results?.[0]?.formatted_address || '';
-        setDetectedLocation(first);
+        setDetectedLocation('GPS detectado para priorizar resultados');
         setDetectingLocation(false);
       },
       () => {
@@ -139,13 +108,12 @@ export default function Venues() {
     e.preventDefault();
     try {
       setCreating(true);
-      const resolved = await resolveAddressMeta(form.address);
-      const inferredCity = resolved.city;
+      const inferredCity = form.inferred_city || inferCityFromText(form.address) || null;
       if (!inferredCity) {
         throw new Error('Seleccioná una dirección que incluya ciudad');
       }
-      await venuesAPI.create({ ...form, city: inferredCity, address: resolved.address || form.address });
-      setForm({ name: '', address: '', football_types: [], services: [] });
+      await venuesAPI.create({ ...form, city: inferredCity, address: form.address.trim() });
+      setForm({ name: '', address: '', inferred_city: '', football_types: [], services: [] });
       setShowCreate(false);
       const data = await venuesAPI.getAll({});
       setVenues(data);
@@ -157,8 +125,7 @@ export default function Venues() {
   };
 
   const useDetectedLocation = () => {
-    if (!detectedLocation) return;
-    setForm((p) => ({ ...p, address: detectedLocation }));
+    detectMyLocation();
   };
 
   useEffect(() => {
@@ -176,36 +143,28 @@ export default function Venues() {
         return;
       }
 
-      const locationBias = detectedCoords
-        ? {
-            center: new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng),
-            radius: 50000,
-          }
-        : undefined;
+      const req = {
+        input: query,
+        types: ['geocode'],
+        language: 'es',
+      };
+      if (detectedCoords) {
+        req.location = new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng);
+        req.radius = 50000;
+      }
 
-      const [geoPredictions, regionPredictions] = await Promise.all([
-        getPredictions(service, {
-          input: query,
-          types: ['geocode'],
-          language: 'es',
-          locationBias,
-        }),
-        getPredictions(service, {
-          input: query,
-          types: ['(regions)'],
-          language: 'es',
-          locationBias,
-        }),
-      ]);
+      const geoPredictions = await getPredictions(service, req);
 
       if (cancelled) return;
       const normalizedQuery = query.toLowerCase();
-      const labels = [...geoPredictions, ...regionPredictions].map((p) => p.description).filter(Boolean);
-      const startsWith = labels.filter((label) => label.toLowerCase().startsWith(normalizedQuery));
-      const fallback = labels.filter((label) => label.toLowerCase().includes(normalizedQuery));
-      const names = Array.from(new Set([...(startsWith.length ? startsWith : fallback)])).slice(0, 8);
+      const startsWith = geoPredictions.filter((p) => (p.description || '').toLowerCase().startsWith(normalizedQuery));
+      const fallback = geoPredictions.filter((p) => (p.description || '').toLowerCase().includes(normalizedQuery));
+      const top = (startsWith.length ? startsWith : fallback).slice(0, 8);
 
-      setAddressSuggestions(names);
+      setAddressSuggestions(top.map((p) => ({
+        label: p.description,
+        city: inferCityFromPrediction(p),
+      })));
       setShowAddressSuggestions(true);
     }, 260);
 
@@ -213,7 +172,7 @@ export default function Venues() {
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [form.address]);
+  }, [form.address, detectedCoords]);
 
   return (
     <div className="page-content">
@@ -260,13 +219,13 @@ export default function Venues() {
               <div className="card" style={{ marginTop: '0.35rem', padding: '0.25rem', maxHeight: 180, overflowY: 'auto' }}>
                 {addressSuggestions.map((address) => (
                   <button
-                    key={address}
+                    key={address.label}
                     type="button"
                     className="btn btn-secondary btn-sm"
                     style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                    onMouseDown={() => setForm((p) => ({ ...p, address }))}
+                    onMouseDown={() => setForm((p) => ({ ...p, address: address.label, inferred_city: address.city || '' }))}
                   >
-                    {address}
+                    {address.label}
                   </button>
                 ))}
               </div>

@@ -51,68 +51,28 @@ export default function CreateMatch() {
     return window.__buscoEquipoPlacesService;
   };
 
-  const getGeocoder = () => {
-    if (!window.google?.maps?.Geocoder) return null;
-    if (!window.__buscoEquipoGeocoder) {
-      window.__buscoEquipoGeocoder = new window.google.maps.Geocoder();
-    }
-    return window.__buscoEquipoGeocoder;
+  const inferCityFromPrediction = (prediction) => {
+    const terms = prediction?.terms || [];
+    if (terms.length >= 2) return terms[1]?.value || '';
+    const secondary = prediction?.structured_formatting?.secondary_text || '';
+    return secondary ? secondary.split(',')[0].trim() : '';
   };
 
-  const geocode = (request) => {
-    const geocoder = getGeocoder();
-    if (!geocoder) return Promise.resolve([]);
-    return new Promise((resolve) => {
-      geocoder.geocode(request, (results, status) => {
-        const ok = status === 'OK';
-        resolve(ok ? (results || []) : []);
-      });
-    });
-  };
-
-  const pickCityFromComponents = (components = []) => {
-    const byType = (type) => components.find((c) => (c.types || []).includes(type))?.long_name || '';
-    return (
-      byType('locality')
-      || byType('postal_town')
-      || byType('administrative_area_level_3')
-      || byType('administrative_area_level_2')
-      || byType('administrative_area_level_1')
-      || byType('sublocality')
-      || byType('neighborhood')
-      || byType('country')
-      || ''
-    );
-  };
-
-  const resolveAddressMeta = async (addressText, placeId = null) => {
-    const query = (addressText || '').trim();
-    if (!query) return { city: '', address: '', latitude: null, longitude: null };
-    const results = placeId
-      ? await geocode({ placeId, language: 'es' })
-      : await geocode({ address: query, language: 'es' });
-    const first = results?.[0];
-    if (!first) return { city: '', address: query, latitude: null, longitude: null };
-    return {
-      city: pickCityFromComponents(first.address_components || []),
-      address: first.formatted_address || query,
-      latitude: first.geometry?.location?.lat?.() ?? null,
-      longitude: first.geometry?.location?.lng?.() ?? null,
-    };
+  const inferCityFromText = (address) => {
+    const parts = String(address || '')
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return parts.length >= 2 ? parts[1] : '';
   };
 
   const detectMyLocation = async () => {
     if (!navigator.geolocation) return;
     setDetectingLocation(true);
     navigator.geolocation.getCurrentPosition(
-      async ({ coords }) => {
+      ({ coords }) => {
         setDetectedCoords({ lat: coords.latitude, lng: coords.longitude });
-        const results = await geocode({
-          location: { lat: coords.latitude, lng: coords.longitude },
-          language: 'es',
-        });
-        const first = results?.[0]?.formatted_address || '';
-        setDetectedLocation(first);
+        setDetectedLocation('GPS detectado para priorizar resultados');
         setDetectingLocation(false);
       },
       () => {
@@ -152,34 +112,22 @@ export default function CreateMatch() {
         return;
       }
 
-      const locationBias = detectedCoords
-        ? {
-            center: new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng),
-            radius: 50000,
-          }
-        : undefined;
+      const req = {
+        input: query,
+        types: ['geocode'],
+        language: 'es',
+      };
+      if (detectedCoords) {
+        req.location = new window.google.maps.LatLng(detectedCoords.lat, detectedCoords.lng);
+        req.radius = 50000;
+      }
 
-      const [geoPredictions, regionPredictions] = await Promise.all([
-        getPredictions(service, {
-          input: query,
-          types: ['geocode'],
-          language: 'es',
-          locationBias,
-        }),
-        getPredictions(service, {
-          input: query,
-          types: ['(regions)'],
-          language: 'es',
-          locationBias,
-        }),
-      ]);
+      const geoPredictions = await getPredictions(service, req);
 
       if (cancelled) return;
       const normalizedQuery = query.toLowerCase();
-      const labels = [...geoPredictions, ...regionPredictions].map((p) => p.description).filter(Boolean);
-      const merged = [...geoPredictions, ...regionPredictions]
-        .filter((p) => p?.description)
-        .filter((p, idx, arr) => arr.findIndex((x) => x.place_id === p.place_id) === idx);
+      const merged = [...geoPredictions]
+        .filter((p) => p?.description);
       const startsWith = merged.filter((p) => p.description.toLowerCase().startsWith(normalizedQuery));
       const fallback = merged.filter((p) => p.description.toLowerCase().includes(normalizedQuery));
       const top = (startsWith.length ? startsWith : fallback).slice(0, 8);
@@ -187,6 +135,7 @@ export default function CreateMatch() {
       setAddressSuggestions(top.map((p) => ({
         label: p.description,
         placeId: p.place_id,
+        city: inferCityFromPrediction(p),
       })));
       setShowAddressSuggestions(true);
     }, 260);
@@ -198,12 +147,7 @@ export default function CreateMatch() {
   }, [currentAddressQuery, detectedCoords]);
 
   const useDetectedLocation = () => {
-    if (!detectedLocation) return;
-    if (requestType === 'casual_match') {
-      setMatchForm((p) => ({ ...p, venue: detectedLocation }));
-    } else {
-      setTournamentForm((p) => ({ ...p, venue: detectedLocation }));
-    }
+    detectMyLocation();
   };
 
   const isAddressValid = (address) => {
@@ -230,16 +174,16 @@ export default function CreateMatch() {
         if (matchForm.age_restricted && parseInt(matchForm.min_age || '0') > parseInt(matchForm.max_age || '0')) {
           throw new Error('El rango de edad no es válido');
         }
-        const resolved = await resolveAddressMeta(matchForm.venue, matchForm.inferred_place_id || null);
-        const inferredCity = matchForm.inferred_city || resolved.city || 'Sin ciudad';
+        const inferredCity = matchForm.inferred_city || inferCityFromText(matchForm.venue) || null;
+        const normalizedAddress = matchForm.venue.trim();
         await matchesAPI.create({
           football_type: parseInt(footballType),
           title: `Partido F${footballType}`,
           city: inferredCity,
-          address: resolved.address || matchForm.venue,
-          latitude: resolved.latitude,
-          longitude: resolved.longitude,
-          zone: inferredCity,
+          address: normalizedAddress,
+          latitude: null,
+          longitude: null,
+          zone: inferredCity || normalizedAddress,
           match_date: matchForm.date,
           match_time: matchForm.time,
           max_players: Math.max(parseInt(matchForm.needed_players || '1') + 1, 2),
@@ -265,15 +209,15 @@ export default function CreateMatch() {
         if (tournamentForm.age_restricted && parseInt(tournamentForm.min_age || '0') > parseInt(tournamentForm.max_age || '0')) {
           throw new Error('El rango de edad no es válido');
         }
-        const tournamentResolved = await resolveAddressMeta(tournamentForm.venue, tournamentForm.inferred_place_id || null);
+        const inferredCity = tournamentForm.inferred_city || inferCityFromText(tournamentForm.venue) || null;
         await tournamentsAPI.create({
           name: tournamentForm.name,
           football_type: parseInt(footballType),
           start_date: tournamentForm.start_date,
           max_teams: 2,
           entry_price: 0,
-          city: tournamentForm.inferred_city || tournamentResolved.city || null,
-          venue_name: tournamentResolved.address || tournamentForm.venue || null,
+          city: inferredCity,
+          venue_name: tournamentForm.venue?.trim() || null,
           match_gender: tournamentForm.match_gender,
           age_restricted: !!tournamentForm.age_restricted,
           min_age: tournamentForm.age_restricted ? parseInt(tournamentForm.min_age || '0') : null,
@@ -358,12 +302,11 @@ export default function CreateMatch() {
                       type="button"
                       className="btn btn-secondary btn-sm"
                       style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                      onMouseDown={async () => {
-                        const meta = await resolveAddressMeta(s.label, s.placeId);
+                      onMouseDown={() => {
                         setMatchForm((p) => ({
                           ...p,
-                          venue: meta.address || s.label,
-                          inferred_city: meta.city || '',
+                          venue: s.label,
+                          inferred_city: s.city || '',
                           inferred_place_id: s.placeId || '',
                         }));
                       }}
@@ -460,12 +403,11 @@ export default function CreateMatch() {
                       type="button"
                       className="btn btn-secondary btn-sm"
                       style={{ width: '100%', justifyContent: 'flex-start', marginBottom: '0.25rem' }}
-                      onMouseDown={async () => {
-                        const meta = await resolveAddressMeta(s.label, s.placeId);
+                      onMouseDown={() => {
                         setTournamentForm((p) => ({
                           ...p,
-                          venue: meta.address || s.label,
-                          inferred_city: meta.city || '',
+                          venue: s.label,
+                          inferred_city: s.city || '',
                           inferred_place_id: s.placeId || '',
                         }));
                       }}
