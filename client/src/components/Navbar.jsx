@@ -1,20 +1,22 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 
 export default function Navbar() {
   const { user } = useAuth();
+  const { t } = useUI();
   const navigate = useNavigate();
 
   return (
     <nav className="bottom-nav">
       <NavLink to="/" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end>
         <span className="nav-icon">⚽</span>
-        <span>Solicitudes</span>
+        <span>{t('requests')}</span>
       </NavLink>
 
       <NavLink to="/venues" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
         <span className="nav-icon">🏟️</span>
-        <span>Canchas</span>
+        <span>{t('courts')}</span>
       </NavLink>
 
       <button
@@ -24,7 +26,7 @@ export default function Navbar() {
         }}
         aria-label="Me faltan jugadores"
       >
-        <span>Me faltan jugadores</span>
+        <span>{t('global_cta')}</span>
       </button>
 
       <NavLink
@@ -32,7 +34,7 @@ export default function Navbar() {
         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
       >
         <span className="nav-icon">👤</span>
-        <span>{user ? 'Perfil' : 'Cuenta'}</span>
+        <span>{user ? t('profile') : t('account')}</span>
       </NavLink>
     </nav>
   );

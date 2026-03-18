@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -146,6 +147,7 @@ function matchesProfileRestrictions(item, profile) {
 
 export default function Feed() {
   const { user, profile } = useAuth();
+  const { t } = useUI();
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -511,13 +513,13 @@ export default function Feed() {
 
       <div className="feed-header-compact">
         <div className="feed-header-copy">
-          <h1 className="feed-title">¿Tenés ganas de jugar?</h1>
-          <p className="feed-subtitle">Encontrá partidos, torneos o un club y sumate.</p>
+          <h1 className="feed-title">{t('feed_title')}</h1>
+          <p className="feed-subtitle">{t('feed_subtitle')}</p>
         </div>
         <div className="feed-header-actions">
           <div className="feed-filter-wrap" ref={filtersWrapRef}>
             <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFiltersOpen((f) => !f)}>
-              Filtros
+              {t('filters')}
             </button>
             {filtersOpen && (
               <>
@@ -589,7 +591,7 @@ export default function Feed() {
               aria-label="Canchas: agregá cancha, horarios, disponibilidad y servicios"
               onClick={() => navigate('/venues')}
             >
-              Canchas
+              {t('courts')}
             </button>
           </div>
         </div>
@@ -795,13 +797,13 @@ export default function Feed() {
 
                   return (
                     <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleJoin(req.id); }}>
-                      Quiero sumarme
+                      {t('join')}
                     </button>
                   );
                 })()
               ) : req.kind === 'Tournament' ? (
                 <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApplyTournament(req.id); }}>
-                  Quiero sumarme
+                  {t('join')}
                 </button>
               ) : (
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>

@@ -470,6 +470,72 @@ export const profilesAPI = {
     return data || [];
   },
 
+  async searchGlobal(term, currentUserId) {
+    const trimmed = String(term || '').trim();
+    if (!trimmed) return [];
+
+    const results = [];
+
+    const { data: profiles, error: pError } = await supabase
+      .from('profiles')
+      .select('id, username, name, avatar_url, city, zone')
+      .eq('is_profile_public', true)
+      .or(`username.ilike.%${trimmed}%,name.ilike.%${trimmed}%,nickname.ilike.%${trimmed}%`)
+      .order('name', { ascending: true })
+      .limit(8);
+    if (!pError) {
+      (profiles || []).forEach((p) => {
+        if (currentUserId && String(p.id) === String(currentUserId)) return;
+        results.push({
+          id: `profile-${p.id}`,
+          entityType: 'profile',
+          entityId: p.id,
+          name: p.name || p.username || 'Sin nombre',
+          subtitle: [p.city, p.zone].filter(Boolean).join(' - ') || 'Perfil',
+        });
+      });
+    }
+
+    const { data: clubs, error: cError } = await supabase
+      .from('clubs')
+      .select('id, name, city, zone, creator_id')
+      .ilike('name', `%${trimmed}%`)
+      .order('name', { ascending: true })
+      .limit(8);
+    if (!cError) {
+      (clubs || []).forEach((c) => {
+        results.push({
+          id: `club-${c.id}`,
+          entityType: 'club',
+          entityId: c.id,
+          ownerId: c.creator_id || null,
+          name: c.name || 'Club',
+          subtitle: [c.city, c.zone].filter(Boolean).join(' - ') || 'Club',
+        });
+      });
+    }
+
+    const { data: venues, error: vError } = await supabase
+      .from('venues')
+      .select('id, name, city, zone')
+      .ilike('name', `%${trimmed}%`)
+      .order('name', { ascending: true })
+      .limit(8);
+    if (!vError) {
+      (venues || []).forEach((v) => {
+        results.push({
+          id: `venue-${v.id}`,
+          entityType: 'venue',
+          entityId: v.id,
+          name: v.name || 'Cancha',
+          subtitle: [v.city, v.zone].filter(Boolean).join(' - ') || 'Cancha',
+        });
+      });
+    }
+
+    return results.slice(0, 20);
+  },
+
   async updateMine(profileData) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Debes iniciar sesión');
@@ -1342,7 +1408,17 @@ export const supportAPI = {
         status: 'open'
       });
     if (error) throw error;
-  }
+  },
+
+  async sendSuggestion(message) {
+    const target = 'maximiliano.g.velasco@gmail.com';
+    const normalized = String(message || '').trim();
+    if (!normalized) throw new Error('Completá tu sugerencia');
+    await this.createTicket(
+      `Sugerencia para ${target}`,
+      `${normalized}\n\nDestino sugerido: ${target}`
+    );
+  },
 };
 
 export const reportsAPI = {

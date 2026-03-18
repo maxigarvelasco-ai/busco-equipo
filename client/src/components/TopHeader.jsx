@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { notificationsAPI, profilesAPI } from '../services/api';
+import { notificationsAPI, profilesAPI, supportAPI } from '../services/api';
+import { useUI } from '../context/UIContext';
 
 export default function TopHeader() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, language, setLanguage, t } = useUI();
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
@@ -17,6 +19,10 @@ export default function TopHeader() {
   const [addedContacts, setAddedContacts] = useState({});
   const [addingContactId, setAddingContactId] = useState(null);
   const [searchStatus, setSearchStatus] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [suggestionText, setSuggestionText] = useState('');
+  const [sendingSuggestion, setSendingSuggestion] = useState(false);
   const topActionsRef = useRef(null);
 
   useEffect(() => {
@@ -42,16 +48,17 @@ export default function TopHeader() {
   }, [user]);
 
   useEffect(() => {
-    if (!searchOpen && !notifOpen) return;
+    if (!searchOpen && !notifOpen && !menuOpen) return;
     function handleOutsideClick(e) {
       if (topActionsRef.current && !topActionsRef.current.contains(e.target)) {
         setSearchOpen(false);
         setNotifOpen(false);
+        setMenuOpen(false);
       }
     }
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [searchOpen, notifOpen]);
+  }, [searchOpen, notifOpen, menuOpen]);
 
   useEffect(() => {
     if (!searchOpen) return;
@@ -75,9 +82,10 @@ export default function TopHeader() {
       setSearchStatus('');
       try {
         const list = await profilesAPI.searchProfiles(q, user.id);
-        setSearchResults(list || []);
-        if (!list?.length) {
-          setSearchStatus('No encontramos perfiles con ese texto');
+        const listGlobal = await profilesAPI.searchGlobal(q, user.id);
+        setSearchResults(listGlobal || []);
+        if (!listGlobal?.length) {
+          setSearchStatus(t('no_results'));
         }
       } catch {
         setSearchResults([]);
@@ -88,7 +96,7 @@ export default function TopHeader() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchOpen, searchTerm, user]);
+  }, [searchOpen, searchTerm, user, t]);
 
   async function handleAddContact(profileId) {
     if (!user) {
@@ -113,6 +121,54 @@ export default function TopHeader() {
     setNotifOpen(false);
     setSearchTerm('');
     navigate(`/users/${profileId}`);
+  }
+
+  function goToSearchResult(item) {
+    setSearchOpen(false);
+    setNotifOpen(false);
+    setMenuOpen(false);
+    setSearchTerm('');
+
+    if (item?.entityType === 'profile') {
+      navigate(`/users/${item.entityId}`);
+      return;
+    }
+    if (item?.entityType === 'club') {
+      if (item.ownerId) {
+        navigate(`/users/${item.ownerId}`);
+      } else {
+        navigate('/');
+      }
+      return;
+    }
+    if (item?.entityType === 'venue') {
+      navigate('/venues', { state: { focusVenueId: item.entityId } });
+      return;
+    }
+  }
+
+  async function handleSendSuggestion() {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!suggestionText.trim()) {
+      setSearchStatus(t('suggestion_error'));
+      return;
+    }
+
+    setSendingSuggestion(true);
+    try {
+      await supportAPI.sendSuggestion(suggestionText.trim());
+      setSuggestionText('');
+      setSuggestionOpen(false);
+      setMenuOpen(false);
+      setSearchStatus(t('suggestion_sent'));
+    } catch {
+      setSearchStatus(t('suggestion_error'));
+    } finally {
+      setSendingSuggestion(false);
+    }
   }
 
   function resolveNotifPath(notif) {
@@ -167,21 +223,82 @@ export default function TopHeader() {
   }
 
   return (
-    <header className="top-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
+    <header className="top-header top-header-custom" ref={topActionsRef} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
+      <div className="top-header-actions">
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          style={{ minWidth: 44, height: 36, padding: '0 0.7rem' }}
+          onClick={() => {
+            setMenuOpen((prev) => !prev);
+            setSearchOpen(false);
+            setNotifOpen(false);
+          }}
+          aria-label={t('menu')}
+          title={t('menu')}
+        >
+          ☰
+        </button>
+
+        {menuOpen && (
+          <div className="header-menu-panel">
+            <button className="btn btn-secondary btn-sm" type="button" onClick={toggleTheme}>
+              {theme === 'dark' ? t('light_mode') : t('dark_mode')}
+            </button>
+
+            <div className="header-lang-row">
+              <span>{t('language')}:</span>
+              <button className={`btn btn-sm ${language === 'es' ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => setLanguage('es')}>ES</button>
+              <button className={`btn btn-sm ${language === 'en' ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => setLanguage('en')}>EN</button>
+              <button className={`btn btn-sm ${language === 'pt' ? 'btn-primary' : 'btn-secondary'}`} type="button" onClick={() => setLanguage('pt')}>PT</button>
+            </div>
+
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setMenuOpen(false); navigate('/support'); }}>
+              {t('app_policies')}
+            </button>
+
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSuggestionOpen((v) => !v)}>
+              {t('send_suggestion')}
+            </button>
+
+            {suggestionOpen && (
+              <div className="header-suggestion-box">
+                <textarea
+                  className="form-textarea"
+                  value={suggestionText}
+                  onChange={(e) => setSuggestionText(e.target.value)}
+                  placeholder={t('suggestion_placeholder')}
+                />
+                <div className="header-suggestion-actions">
+                  <button className="btn btn-secondary btn-sm" type="button" onClick={() => setSuggestionOpen(false)}>{t('cancel')}</button>
+                  <button className="btn btn-primary btn-sm" type="button" onClick={handleSendSuggestion} disabled={sendingSuggestion}>
+                    {sendingSuggestion ? t('save_in_progress') : t('send')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {user && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={async () => {
+                  await logout();
+                  navigate('/login');
+                }}
+              >
+                {t('logout')}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="top-header-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer', margin: 0 }}>
         ⚽ Busco<span>Equipo</span>
       </div>
-      <div className="top-header-actions" ref={topActionsRef}>
-        {user && (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={() => navigate('/create-match')}
-            aria-label="Crear partido"
-          >
-            +
-          </button>
-        )}
+
+      <div className="top-header-actions">
         <button
           type="button"
           className="btn btn-secondary btn-sm"
@@ -192,9 +309,11 @@ export default function TopHeader() {
               return;
             }
             setSearchOpen((prev) => !prev);
+            setNotifOpen(false);
+            setMenuOpen(false);
           }}
-          aria-label="Buscar perfiles"
-          title="Buscar perfiles"
+          aria-label={t('search_placeholder')}
+          title={t('search_placeholder')}
         >
           🔎
         </button>
@@ -203,7 +322,7 @@ export default function TopHeader() {
           className="btn btn-secondary btn-sm"
           style={{ minWidth: 44, height: 36, position: 'relative', padding: '0 0.7rem' }}
           onClick={openNotificationsPanel}
-          aria-label="Notificaciones"
+          aria-label={t('notifications')}
         >
           🔔
           {user && unreadCount > 0 && (
@@ -229,27 +348,12 @@ export default function TopHeader() {
             </span>
           )}
         </button>
-        {user && (
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={async () => {
-              await logout();
-              navigate('/login');
-            }}
-            aria-label="Cerrar sesión"
-            title="Cerrar sesión"
-          >
-            Salir
-          </button>
-        )}
-
         {searchOpen && user && (
           <div className="header-search-panel">
             <div className="header-search-input-wrap">
               <input
                 className="form-input"
-                placeholder="Buscar por nombre, ciudad o zona"
+                placeholder={t('search_placeholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 autoFocus
@@ -258,11 +362,11 @@ export default function TopHeader() {
 
             <div className="header-search-results">
               {searching ? (
-                <div className="header-search-empty">Buscando...</div>
+                <div className="header-search-empty">{t('searching')}</div>
               ) : searchResults.length > 0 ? (
                 searchResults.map((p) => {
-                  const added = !!addedContacts[p.id];
-                  const location = [p.city, p.zone].filter(Boolean).join(' - ') || 'Sin ubicacion';
+                  const added = !!addedContacts[p.entityId || p.id];
+                  const location = p.subtitle || 'Sin ubicacion';
                   return (
                     <div key={p.id} className="header-search-item">
                       <div>
@@ -270,26 +374,30 @@ export default function TopHeader() {
                         <div className="header-search-meta">{location}</div>
                       </div>
                       <div className="header-search-actions">
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => goToUserProfile(p.id)}>
-                          Ver
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => goToSearchResult(p)}>
+                          {t('view')}
                         </button>
-                        <button type="button" className="btn btn-primary btn-sm" onClick={() => goToUserProfile(p.id)}>
-                          Mensaje
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          disabled={added || addingContactId === p.id}
-                          onClick={() => handleAddContact(p.id)}
-                        >
-                          {added ? 'Agregado' : (addingContactId === p.id ? 'Guardando...' : 'Contacto')}
-                        </button>
+                        {p.entityType === 'profile' ? (
+                          <>
+                            <button type="button" className="btn btn-primary btn-sm" onClick={() => goToUserProfile(p.entityId || p.id)}>
+                              {t('message')}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={added || addingContactId === (p.entityId || p.id)}
+                              onClick={() => handleAddContact(p.entityId || p.id)}
+                            >
+                              {added ? t('added') : (addingContactId === (p.entityId || p.id) ? t('save_in_progress') : t('contact'))}
+                            </button>
+                          </>
+                        ) : null}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="header-search-empty">{searchStatus || 'Empeza a escribir para buscar perfiles.'}</div>
+                <div className="header-search-empty">{searchStatus || t('search_empty')}</div>
               )}
             </div>
           </div>
@@ -298,7 +406,7 @@ export default function TopHeader() {
         {notifOpen && user && (
           <div className="header-notif-panel">
             <div className="header-notif-head">
-              <strong>Notificaciones</strong>
+              <strong>{t('notifications')}</strong>
               <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/notifications')}>
                 Ver todas
               </button>

@@ -15,6 +15,7 @@ import Support from './pages/Support';
 import NotFoundPage from './pages/NotFoundPage';
 import CompleteProfile from './pages/CompleteProfile';
 import Notifications from './pages/Notifications';
+import { UIProvider } from './context/UIContext';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -74,9 +75,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <UIProvider>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </UIProvider>
     </BrowserRouter>
   );
 }
