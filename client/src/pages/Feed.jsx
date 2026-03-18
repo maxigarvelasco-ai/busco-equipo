@@ -167,20 +167,34 @@ export default function Feed() {
     const joinedNum = Math.max(Number(joined || 0), 0);
     const neededNum = Math.max(Number(needed || 0), 0);
     const missing = Math.max(neededNum - joinedNum, 0);
-    return `Faltan ${missing} jugadores de ${neededNum}`;
+    if (missing === 1) return 'Falta 1 jugador';
+    return `Faltan ${missing} jugadores`;
   };
 
   const buildSlotsVisual = (joined, needed) => {
     const totalSlots = Math.max(Number(needed || 0), 1);
     const filledSlots = Math.min(Math.max(Number(joined || 0), 0), totalSlots);
     const missingSlots = Math.max(totalSlots - filledSlots, 0);
+    const maxVisible = Math.min(totalSlots, 6);
+    const hiddenSlots = Math.max(totalSlots - maxVisible, 0);
+    const visibleSlots = Array.from({ length: maxVisible }).map((_, idx) => (idx < Math.min(filledSlots, maxVisible) ? 'filled' : 'empty'));
 
     return {
       totalSlots,
       filledSlots,
       missingSlots,
+      hiddenSlots,
+      visibleSlots,
       missingLabel: missingSlots === 1 ? 'Falta 1 jugador' : `Faltan ${missingSlots} jugadores`,
     };
+  };
+
+  const cleanDescription = (rawDescription) => {
+    const text = String(rawDescription || '').trim();
+    if (!text) return null;
+    if (text.length < 6) return null;
+    if (/^(test|prueba|lorem|ipsum|asdf|qwerty|xxx)+$/i.test(text.replace(/\s+/g, ''))) return null;
+    return text;
   };
 
   const loadMatches = useCallback(async (showSpinner = false) => {
@@ -447,27 +461,25 @@ export default function Feed() {
   const activeFilterChips = [];
   if (selectedFootballType !== 'all') {
     const f = FOOTBALL_TYPES.find((x) => x.key === selectedFootballType);
-    if (f) activeFilterChips.push(`Futbol: ${f.label}`);
+    if (f) activeFilterChips.push(`Fútbol: ${f.label}`);
   }
   if (selectedRequestType !== 'all') {
     const t = REQUEST_TYPE_OPTIONS.find((x) => x.value === selectedRequestType);
-    if (t) activeFilterChips.push(`Publicacion: ${t.label}`);
+    if (t) activeFilterChips.push(`Tipo: ${t.label}`);
   }
   if (selectedGender !== 'all') {
     const g = GENDER_FILTERS.find((x) => x.value === selectedGender);
-    if (g) activeFilterChips.push(`Genero: ${g.label}`);
+    if (g) activeFilterChips.push(`Género: ${g.label}`);
   }
 
   const getRequestCardTitle = (req) => {
     if (req.kind === 'Match') {
-      return String(req.raw?.match_kind || '').toLowerCase() === 'futsal'
-        ? 'Partido de futsal'
-        : `Partido de futbol ${req.football_type || '-'}`;
+      return String(req.raw?.match_kind || '').toLowerCase() === 'futsal' ? 'Partido Futsal' : `Partido F${req.football_type || '-'}`;
     }
     if (req.kind === 'Tournament') {
-      return req.raw?.name || `Torneo de futbol ${req.football_type || '-'}`;
+      return req.raw?.name || `Torneo F${req.football_type || '-'}`;
     }
-    return req.organizer_name ? `Busqueda de jugadores para ${req.organizer_name}` : 'Busqueda de jugadores para club';
+    return req.organizer_name ? `Búsqueda de jugadores · ${req.organizer_name}` : 'Búsqueda de jugadores · Club';
   };
 
   return (
@@ -476,44 +488,29 @@ export default function Feed() {
         <div className={`toast toast-${toast.type}`}>{toast.message}</div>
       )}
 
-      <div className="feed-hero card">
-        <div className="feed-hero-head">
-          <div>
-            <h1 className="feed-hero-title">¿Tenes ganas de jugar?</h1>
-            <p className="feed-hero-subtitle">Encontra partidos, torneos o un club y sumate en segundos.</p>
-            <p className="feed-hero-help">Elegi una publicacion y toca "Quiero sumarme" para enviar tu solicitud.</p>
-          </div>
+      <div className="feed-header-compact">
+        <div className="feed-header-copy">
+          <h1 className="feed-title">¿Tenés ganas de jugar?</h1>
+          <p className="feed-subtitle">Encontrá partidos, torneos o un club y sumate.</p>
+        </div>
+        <div className="feed-header-actions">
+          <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFiltersOpen(true)}>
+            Filtros
+          </button>
           <div className="feed-venue-menu-wrap">
             <button className="btn btn-secondary btn-sm" type="button" onClick={() => setVenueMenuOpen((v) => !v)}>
-              Soy cancha ▾
+              Soy cancha
             </button>
             {venueMenuOpen && (
               <div className="feed-venue-menu card">
                 <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
                   Publicar mi cancha
                 </button>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Cargar horarios
-                </button>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Gestionar disponibilidad
-                </button>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Editar servicios
-                </button>
+                <p className="feed-venue-menu-note">Agregá tu cancha y cargá horarios para que te encuentren.</p>
               </div>
             )}
           </div>
         </div>
-      </div>
-
-      <div className="feed-toolbar">
-        <button className="btn btn-secondary" type="button" onClick={() => setFiltersOpen(true)}>
-          Filtros
-        </button>
-        <button className="btn btn-outline" type="button" onClick={() => navigate(user ? '/create-match' : '/login')}>
-          Ver mis opciones para publicar
-        </button>
       </div>
 
       {activeFilterChips.length > 0 && (
@@ -531,7 +528,7 @@ export default function Feed() {
             <h3>Filtros</h3>
 
             <div className="feed-filter-section">
-              <div className="feed-filter-label">Tipo de futbol</div>
+              <div className="feed-filter-label">Tipo de fútbol</div>
               <div className="feed-filter-options">
                 {FOOTBALL_TYPES.filter((f) => f.key !== 'all').map((f) => (
                   <button
@@ -547,7 +544,7 @@ export default function Feed() {
             </div>
 
             <div className="feed-filter-section">
-              <div className="feed-filter-label">Tipo de publicacion</div>
+              <div className="feed-filter-label">Tipo</div>
               <div className="feed-filter-options">
                 {REQUEST_TYPE_OPTIONS.filter((t) => t.value !== 'all').map((t) => (
                   <button
@@ -563,7 +560,7 @@ export default function Feed() {
             </div>
 
             <div className="feed-filter-section">
-              <div className="feed-filter-label">Genero</div>
+              <div className="feed-filter-label">Género</div>
               <div className="feed-filter-options">
                 {GENDER_FILTERS.filter((g) => g.value !== 'all').map((g) => (
                   <button
@@ -625,24 +622,23 @@ export default function Feed() {
             }}
           >
             <div className="match-card-header">
-              <div className="match-type" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+              <div className="match-type">
                 <h3 className="match-card-title">{getRequestCardTitle(req)}</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <span className="match-type-icon">{req.kind === 'Match' ? '⚽' : (req.kind === 'Tournament' ? '🏆' : '🛡️')}</span>
-                <span className="match-type-label">
-                  {req.kind === 'Match'
-                    ? (String(req.raw?.match_kind || '').toLowerCase() === 'futsal' ? 'Partido Futsal' : `Partido F${req.football_type}`)
-                    : (req.kind === 'Tournament' ? `Torneo F${req.football_type}` : `Club F${req.football_type || '-'}`)}
-                </span>
-                </div>
               </div>
-              <span className="badge badge-type">{req.match_gender || 'mixto'}</span>
+              <div className="match-badges-compact">
+                <span className="badge badge-type">{req.kind === 'Club' ? 'Club' : `F${req.football_type || '-'}`}</span>
+                <span className="badge badge-type">{req.match_gender || 'mixto'}</span>
+              </div>
             </div>
 
             <div className="match-info">
               <div className="match-info-row">
                 <span className="info-icon">📍</span>
                 <span>{req.locationLabel || 'Sin ubicacion'}</span>
+              </div>
+              <div className="match-info-row">
+                <span className="info-icon">🕒</span>
+                <span>{formatWhen(req.date, req.time)}</span>
               </div>
               <div className="match-info-row">
                 <span className="info-icon">👤</span>
@@ -661,34 +657,25 @@ export default function Feed() {
                   <span>Organiza: {req.organizer_name || 'Anónimo'}</span>
                 )}
               </div>
-              <div className="match-info-row">
-                <span className="info-icon">🕒</span>
-                <span>{formatWhen(req.date, req.time)}</span>
-              </div>
               {req.kind === 'Match' ? (
                 (() => {
                   const slots = buildSlotsVisual(req.joined_needed_players, req.needed_players);
                   return (
-                    <div className="match-slots-card">
-                      <div className="match-slots-title">Cupos para completar</div>
-                      <div className="match-slots-track" role="img" aria-label={`${slots.filledSlots} cupos cubiertos de ${slots.totalSlots}`}>
-                        {Array.from({ length: slots.totalSlots }).map((_, idx) => {
-                          const isFilled = idx < slots.filledSlots;
-                          return (
-                            <span
-                              key={`slot-${req.id}-${idx}`}
-                              className={`match-slot ${isFilled ? 'is-filled' : 'is-empty'}`}
-                              title={isFilled ? 'Cupo cubierto' : 'Cupo disponible'}
-                            >
-                              <span className="match-slot-avatar">{isFilled ? '●' : '○'}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                      <div className="match-slots-text">
+                    <div className="match-info-row match-cupos-inline">
+                      <span className="info-icon">👥</span>
+                      <span className="match-cupos-label">Cupos:</span>
+                      <span className="match-slots-track-inline" role="img" aria-label={`${slots.filledSlots} cupos cubiertos de ${slots.totalSlots}`}>
+                        {slots.visibleSlots.map((state, idx) => (
+                          <span key={`slot-${req.id}-${idx}`} className={`match-slot-inline ${state === 'filled' ? 'is-filled' : 'is-empty'}`}>
+                            {state === 'filled' ? '●' : '○'}
+                          </span>
+                        ))}
+                        {slots.hiddenSlots > 0 && <span className="match-slots-more">+{slots.hiddenSlots}</span>}
+                      </span>
+                      <span className="match-cupos-text">
                         {slots.missingLabel}
                         {req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
-                      </div>
+                      </span>
                     </div>
                   );
                 })()
@@ -696,7 +683,7 @@ export default function Feed() {
                 <>
                   <div className="match-info-row">
                     <span className="info-icon">🎯</span>
-                    <span>{req.position_needed ? `Buscan ${req.position_needed}` : 'Busqueda abierta de jugadores'}</span>
+                    <span>{req.position_needed ? `Buscan ${req.position_needed}` : 'Búsqueda abierta de jugadores'}</span>
                   </div>
                   {req.club_contact_name && (
                     <div className="match-info-row">
@@ -727,10 +714,10 @@ export default function Feed() {
                   <span>{buildNeedLabel(req.joined_needed_players, req.needed_players)}</span>
                 </div>
               )}
-              {req.description && (
+              {cleanDescription(req.description) && (
                 <div className="match-info-row">
                   <span className="info-icon">💬</span>
-                  <span>{req.description}</span>
+                  <span>{cleanDescription(req.description)}</span>
                 </div>
               )}
               {req.kind === 'Match' && req.distanceKm != null && (
@@ -754,7 +741,9 @@ export default function Feed() {
                   if (isCreator) {
                     return (
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        <span className="badge badge-type">TU PARTIDO</span>
+                        <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); navigate(`/match/${req.id}`); }}>
+                          Editar
+                        </button>
                         <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
                           Eliminar
                         </button>
@@ -816,15 +805,6 @@ export default function Feed() {
           </div>
         ))
       )}
-
-      <button
-        className="feed-fab-extended"
-        type="button"
-        onClick={() => navigate(user ? '/create-match' : '/login')}
-      >
-        <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
-        <span>Me faltan jugadores</span>
-      </button>
     </div>
   );
 }
