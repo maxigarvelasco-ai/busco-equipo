@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
@@ -162,6 +162,8 @@ export default function Feed() {
   const [draftRequestType, setDraftRequestType] = useState('all');
   const [draftGender, setDraftGender] = useState('all');
   const [venueMenuOpen, setVenueMenuOpen] = useState(false);
+  const filtersWrapRef = useRef(null);
+  const venueWrapRef = useRef(null);
 
   const buildNeedLabel = (joined, needed) => {
     const joinedNum = Math.max(Number(joined || 0), 0);
@@ -192,9 +194,11 @@ export default function Feed() {
   const cleanDescription = (rawDescription) => {
     const text = String(rawDescription || '').trim();
     if (!text) return null;
-    if (text.length < 6) return null;
-    if (/^(test|prueba|lorem|ipsum|asdf|qwerty|xxx)+$/i.test(text.replace(/\s+/g, ''))) return null;
-    return text;
+    const compact = text.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (compact.length < 6) return null;
+    if (/^(test|prueba|lorem|ipsum|asdf|qwerty|xxx|na|n\/a|sin descripcion|sin descripción|descripcion|descripción|pendiente)$/i.test(compact)) return null;
+    if (/^[x\-_.!?\s]+$/i.test(text)) return null;
+    return text.length > 140 ? `${text.slice(0, 137)}...` : text;
   };
 
   const loadMatches = useCallback(async (showSpinner = false) => {
@@ -248,6 +252,20 @@ export default function Feed() {
       { enableHighAccuracy: false, timeout: 7000, maximumAge: 300000 }
     );
   }, []);
+
+  useEffect(() => {
+    const handleDocClick = (event) => {
+      if (filtersOpen && filtersWrapRef.current && !filtersWrapRef.current.contains(event.target)) {
+        setFiltersOpen(false);
+      }
+      if (venueMenuOpen && venueWrapRef.current && !venueWrapRef.current.contains(event.target)) {
+        setVenueMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocClick);
+    return () => document.removeEventListener('mousedown', handleDocClick);
+  }, [filtersOpen, venueMenuOpen]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -494,19 +512,87 @@ export default function Feed() {
           <p className="feed-subtitle">Encontrá partidos, torneos o un club y sumate.</p>
         </div>
         <div className="feed-header-actions">
-          <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFiltersOpen(true)}>
-            Filtros
-          </button>
-          <div className="feed-venue-menu-wrap">
+          <div className="feed-filter-wrap" ref={filtersWrapRef}>
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setFiltersOpen((f) => !f)}>
+              Filtros
+            </button>
+            {filtersOpen && (
+              <>
+                <button className="feed-filters-backdrop" type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros" />
+                <div className="feed-filters-panel card" role="dialog" aria-modal="true" aria-label="Filtros de publicaciones">
+                  <h3>Filtros</h3>
+
+                  <div className="feed-filter-section">
+                    <div className="feed-filter-label">Tipo de fútbol</div>
+                    <div className="feed-filter-options">
+                      {FOOTBALL_TYPES.filter((f) => f.key !== 'all').map((f) => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          className={`area-pill ${draftFootballType === f.key ? 'active' : ''}`}
+                          onClick={() => setDraftFootballType(f.key)}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="feed-filter-section">
+                    <div className="feed-filter-label">Tipo</div>
+                    <div className="feed-filter-options">
+                      {REQUEST_TYPE_OPTIONS.filter((t) => t.value !== 'all').map((t) => (
+                        <button
+                          key={t.key}
+                          type="button"
+                          className={`area-pill ${draftRequestType === t.value ? 'active' : ''}`}
+                          onClick={() => setDraftRequestType(t.value)}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="feed-filter-section">
+                    <div className="feed-filter-label">Género</div>
+                    <div className="feed-filter-options">
+                      {GENDER_FILTERS.filter((g) => g.value !== 'all').map((g) => (
+                        <button
+                          key={g.key}
+                          type="button"
+                          className={`area-pill ${draftGender === g.value ? 'active' : ''}`}
+                          onClick={() => setDraftGender(g.value)}
+                        >
+                          {g.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="feed-filter-actions">
+                    <button className="btn btn-primary" type="button" onClick={applyFilters}>Aplicar filtros</button>
+                    <button className="btn btn-secondary" type="button" onClick={clearFilters}>Limpiar filtros</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="feed-venue-menu-wrap" ref={venueWrapRef}>
             <button className="btn btn-secondary btn-sm" type="button" onClick={() => setVenueMenuOpen((v) => !v)}>
-              Soy cancha
+              Mi cancha
             </button>
             {venueMenuOpen && (
               <div className="feed-venue-menu card">
                 <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Publicar mi cancha
+                  Publicar cancha
                 </button>
-                <p className="feed-venue-menu-note">Agregá tu cancha y cargá horarios para que te encuentren.</p>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
+                  Gestionar cancha
+                </button>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
+                  Mi cancha
+                </button>
               </div>
             )}
           </div>
@@ -519,68 +605,6 @@ export default function Feed() {
             <span key={chip} className="badge badge-type">{chip}</span>
           ))}
         </div>
-      )}
-
-      {filtersOpen && (
-        <>
-          <button className="feed-filters-backdrop" type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros" />
-          <div className="feed-filters-panel card" role="dialog" aria-modal="true" aria-label="Filtros de publicaciones">
-            <h3>Filtros</h3>
-
-            <div className="feed-filter-section">
-              <div className="feed-filter-label">Tipo de fútbol</div>
-              <div className="feed-filter-options">
-                {FOOTBALL_TYPES.filter((f) => f.key !== 'all').map((f) => (
-                  <button
-                    key={f.key}
-                    type="button"
-                    className={`area-pill ${draftFootballType === f.key ? 'active' : ''}`}
-                    onClick={() => setDraftFootballType(f.key)}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="feed-filter-section">
-              <div className="feed-filter-label">Tipo</div>
-              <div className="feed-filter-options">
-                {REQUEST_TYPE_OPTIONS.filter((t) => t.value !== 'all').map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    className={`area-pill ${draftRequestType === t.value ? 'active' : ''}`}
-                    onClick={() => setDraftRequestType(t.value)}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="feed-filter-section">
-              <div className="feed-filter-label">Género</div>
-              <div className="feed-filter-options">
-                {GENDER_FILTERS.filter((g) => g.value !== 'all').map((g) => (
-                  <button
-                    key={g.key}
-                    type="button"
-                    className={`area-pill ${draftGender === g.value ? 'active' : ''}`}
-                    onClick={() => setDraftGender(g.value)}
-                  >
-                    {g.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="feed-filter-actions">
-              <button className="btn btn-primary" type="button" onClick={applyFilters}>Aplicar filtros</button>
-              <button className="btn btn-secondary" type="button" onClick={clearFilters}>Limpiar filtros</button>
-            </div>
-          </div>
-        </>
       )}
 
       {isLoading ? (
@@ -626,8 +650,8 @@ export default function Feed() {
                 <h3 className="match-card-title">{getRequestCardTitle(req)}</h3>
               </div>
               <div className="match-badges-compact">
-                <span className="badge badge-type">{req.kind === 'Club' ? 'Club' : `F${req.football_type || '-'}`}</span>
-                <span className="badge badge-type">{req.match_gender || 'mixto'}</span>
+                <span className="badge badge-type match-badge-soft">{req.kind === 'Club' ? 'Club' : `F${req.football_type || '-'}`}</span>
+                <span className="badge badge-type match-badge-soft">{req.match_gender || 'mixto'}</span>
               </div>
             </div>
 

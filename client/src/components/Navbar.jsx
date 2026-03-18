@@ -22,10 +22,10 @@ export default function Navbar() {
         onClick={() => {
           user ? navigate('/create-match') : navigate('/login');
         }}
-        aria-label="Publicar"
+        aria-label="Me faltan jugadores"
       >
         <span className="nav-icon">+</span>
-        <span>Publicar</span>
+        <span>Me faltan jugadores</span>
       </button>
 
       <NavLink
