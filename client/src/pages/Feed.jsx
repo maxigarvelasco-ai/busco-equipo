@@ -582,10 +582,15 @@ export default function Feed() {
             )}
           </div>
           <div className="feed-canchas-action">
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/venues')}>
+            <button
+              className="btn btn-secondary btn-sm"
+              type="button"
+              title="Agregá cancha, horarios, disponibilidad y servicios."
+              aria-label="Canchas: agregá cancha, horarios, disponibilidad y servicios"
+              onClick={() => navigate('/venues')}
+            >
               Canchas
             </button>
-            <span className="feed-canchas-hint">Agregá cancha, horarios, disponibilidad y servicios.</span>
           </div>
         </div>
       </div>
