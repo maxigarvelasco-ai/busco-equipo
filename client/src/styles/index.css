@@ -671,26 +671,19 @@ a:hover { color: var(--color-primary-light); }
   margin-bottom: 0.55rem;
 }
 
-.feed-venue-menu-wrap {
-  position: relative;
+.feed-canchas-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
 }
 
-.feed-venue-menu {
-  position: absolute;
-  top: calc(100% + 0.35rem);
-  right: 0;
-  width: min(260px, 84vw);
-  padding: 0.5rem;
-  display: grid;
-  gap: 0.45rem;
-  z-index: 60;
-}
-
-.feed-venue-menu-note {
-  margin: 0;
-  font-size: 0.76rem;
+.feed-canchas-hint {
+  font-size: 0.68rem;
   color: var(--color-text-muted);
-  line-height: 1.3;
+  max-width: 175px;
+  text-align: right;
+  line-height: 1.2;
 }
 
 .feed-filters-backdrop {
@@ -838,15 +831,22 @@ a:hover { color: var(--color-primary-light); }
 .match-cupos-inline {
   align-items: center;
   flex-wrap: wrap;
-  padding: 0.22rem 0.45rem;
+  display: inline-flex;
+  padding: 0.16rem 0.36rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, rgba(34, 197, 94, 0.11), rgba(34, 197, 94, 0.05));
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  width: fit-content;
+}
+
+.match-cupos-inline-wrap {
+  display: flex;
+  align-items: center;
 }
 
 .match-cupos-label {
   color: var(--color-text);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .match-slots-track-inline {
@@ -856,7 +856,7 @@ a:hover { color: var(--color-primary-light); }
 }
 
 .match-slot-inline {
-  font-size: 1rem;
+  font-size: 0.92rem;
   line-height: 1;
 }
 
@@ -875,9 +875,9 @@ a:hover { color: var(--color-primary-light); }
 }
 
 .match-cupos-text {
-  font-size: 0.81rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: #dbeafe;
+  color: #d1e7dc;
 }
 
 .link-button-inline {

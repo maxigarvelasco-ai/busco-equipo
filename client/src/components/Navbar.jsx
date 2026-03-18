@@ -24,7 +24,6 @@ export default function Navbar() {
         }}
         aria-label="Me faltan jugadores"
       >
-        <span className="nav-icon">+</span>
         <span>Me faltan jugadores</span>
       </button>
 
@@ -33,7 +32,7 @@ export default function Navbar() {
         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
       >
         <span className="nav-icon">👤</span>
-        <span>{user ? 'Perfil' : 'Entrar'}</span>
+        <span>{user ? 'Perfil' : 'Cuenta'}</span>
       </NavLink>
     </nav>
   );

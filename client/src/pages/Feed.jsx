@@ -161,9 +161,7 @@ export default function Feed() {
   const [draftFootballType, setDraftFootballType] = useState('all');
   const [draftRequestType, setDraftRequestType] = useState('all');
   const [draftGender, setDraftGender] = useState('all');
-  const [venueMenuOpen, setVenueMenuOpen] = useState(false);
   const filtersWrapRef = useRef(null);
-  const venueWrapRef = useRef(null);
 
   const buildNeedLabel = (joined, needed) => {
     const joinedNum = Math.max(Number(joined || 0), 0);
@@ -195,9 +193,17 @@ export default function Feed() {
     const text = String(rawDescription || '').trim();
     if (!text) return null;
     const compact = text.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (compact.length < 6) return null;
+    if (compact.length < 10) return null;
     if (/^(test|prueba|lorem|ipsum|asdf|qwerty|xxx|na|n\/a|sin descripcion|sin descripción|descripcion|descripción|pendiente)$/i.test(compact)) return null;
     if (/^[x\-_.!?\s]+$/i.test(text)) return null;
+    if (/(.)\1{4,}/.test(compact)) return null;
+
+    const words = compact.split(' ').filter(Boolean);
+    if (words.length < 3) return null;
+
+    const nonWordRatio = (compact.match(/[^a-z0-9áéíóúüñ\s]/gi) || []).length / compact.length;
+    if (nonWordRatio > 0.2) return null;
+
     return text.length > 140 ? `${text.slice(0, 137)}...` : text;
   };
 
@@ -258,14 +264,11 @@ export default function Feed() {
       if (filtersOpen && filtersWrapRef.current && !filtersWrapRef.current.contains(event.target)) {
         setFiltersOpen(false);
       }
-      if (venueMenuOpen && venueWrapRef.current && !venueWrapRef.current.contains(event.target)) {
-        setVenueMenuOpen(false);
-      }
     };
 
     document.addEventListener('mousedown', handleDocClick);
     return () => document.removeEventListener('mousedown', handleDocClick);
-  }, [filtersOpen, venueMenuOpen]);
+  }, [filtersOpen]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -578,23 +581,11 @@ export default function Feed() {
               </>
             )}
           </div>
-          <div className="feed-venue-menu-wrap" ref={venueWrapRef}>
-            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setVenueMenuOpen((v) => !v)}>
-              Mi cancha
+          <div className="feed-canchas-action">
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/venues')}>
+              Canchas
             </button>
-            {venueMenuOpen && (
-              <div className="feed-venue-menu card">
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Publicar cancha
-                </button>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Gestionar cancha
-                </button>
-                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
-                  Mi cancha
-                </button>
-              </div>
-            )}
+            <span className="feed-canchas-hint">Agregá cancha, horarios, disponibilidad y servicios.</span>
           </div>
         </div>
       </div>
@@ -685,7 +676,8 @@ export default function Feed() {
                 (() => {
                   const slots = buildSlotsVisual(req.joined_needed_players, req.needed_players);
                   return (
-                    <div className="match-info-row match-cupos-inline">
+                    <div className="match-cupos-inline-wrap">
+                      <div className="match-info-row match-cupos-inline">
                       <span className="info-icon">👥</span>
                       <span className="match-cupos-label">Cupos:</span>
                       <span className="match-slots-track-inline" role="img" aria-label={`${slots.filledSlots} cupos cubiertos de ${slots.totalSlots}`}>
@@ -700,6 +692,7 @@ export default function Feed() {
                         {slots.missingLabel}
                         {req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
                       </span>
+                      </div>
                     </div>
                   );
                 })()
