@@ -1,8 +1,61 @@
 import { useState } from 'react';
 import { reportsAPI } from '../services/api';
+import { useUI } from '../context/UIContext';
 
 export default function ReportModal({ reportedUserId, reportedUserName, onClose }) {
-  const [reason, setReason] = useState('No se presentó al partido');
+  const { language } = useUI();
+  const i18n = {
+    es: {
+      r1: 'No se presento al partido',
+      r2: 'Comportamiento inadecuado',
+      r3: 'Juego brusco o violento',
+      r4: 'Perfil falso o spam',
+      r5: 'Otro',
+      sent: 'Reporte enviado correctamente.',
+      send_error: 'Error al enviar reporte',
+      title: 'Reportar a',
+      reason: 'Motivo',
+      details: 'Detalles (opcional)',
+      details_ph: 'Explica lo que paso...',
+      cancel: 'Cancelar',
+      sending: 'Enviando...',
+      report: 'Reportar',
+    },
+    en: {
+      r1: 'Did not show up to the match',
+      r2: 'Inappropriate behavior',
+      r3: 'Rough or violent play',
+      r4: 'Fake profile or spam',
+      r5: 'Other',
+      sent: 'Report sent successfully.',
+      send_error: 'Failed to send report',
+      title: 'Report',
+      reason: 'Reason',
+      details: 'Details (optional)',
+      details_ph: 'Explain what happened...',
+      cancel: 'Cancel',
+      sending: 'Sending...',
+      report: 'Report',
+    },
+    pt: {
+      r1: 'Nao compareceu na partida',
+      r2: 'Comportamento inadequado',
+      r3: 'Jogo brusco ou violento',
+      r4: 'Perfil falso ou spam',
+      r5: 'Outro',
+      sent: 'Denuncia enviada com sucesso.',
+      send_error: 'Erro ao enviar denuncia',
+      title: 'Denunciar',
+      reason: 'Motivo',
+      details: 'Detalhes (opcional)',
+      details_ph: 'Explique o que aconteceu...',
+      cancel: 'Cancelar',
+      sending: 'Enviando...',
+      report: 'Denunciar',
+    },
+  }[language];
+
+  const [reason, setReason] = useState(i18n.r1);
   const [details, setDetails] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -13,10 +66,10 @@ export default function ReportModal({ reportedUserId, reportedUserName, onClose 
     try {
       setLoading(true);
       await reportsAPI.reportUser(reportedUserId, reason, details);
-      alert('Reporte enviado correctamente.');
+      alert(i18n.sent);
       onClose();
     } catch (err) {
-      alert(err.message || 'Error al enviar reporte');
+      alert(err.message || i18n.send_error);
     } finally {
       setLoading(false);
     }
@@ -29,35 +82,35 @@ export default function ReportModal({ reportedUserId, reportedUserName, onClose 
       display: 'flex', justifyContent: 'center', alignItems: 'center'
     }}>
       <div className="card" style={{ width: '90%', maxWidth: '400px', padding: '1.5rem' }}>
-        <h3 style={{ marginTop: 0 }}>Reportar a {reportedUserName}</h3>
+        <h3 style={{ marginTop: 0 }}>{i18n.title} {reportedUserName}</h3>
         
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Motivo</label>
+            <label>{i18n.reason}</label>
             <select className="form-input" value={reason} onChange={e => setReason(e.target.value)}>
-              <option value="No se presentó al partido">No se presentó al partido</option>
-              <option value="Comportamiento inadecuado">Comportamiento inadecuado</option>
-              <option value="Juego brusco/violento">Juego brusco/violento</option>
-              <option value="Perfil falso/Spam">Perfil falso/Spam</option>
-              <option value="Otro">Otro</option>
+              <option value={i18n.r1}>{i18n.r1}</option>
+              <option value={i18n.r2}>{i18n.r2}</option>
+              <option value={i18n.r3}>{i18n.r3}</option>
+              <option value={i18n.r4}>{i18n.r4}</option>
+              <option value={i18n.r5}>{i18n.r5}</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label>Detalles (Opcional)</label>
+            <label>{i18n.details}</label>
             <textarea 
               className="form-input" 
               rows="3"
               value={details} 
               onChange={e => setDetails(e.target.value)}
-              placeholder="Explicá lo que pasó..."
+              placeholder={i18n.details_ph}
             />
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>{i18n.cancel}</button>
             <button type="submit" className="btn btn-primary" style={{ flex: 1, background: 'var(--color-danger)' }} disabled={loading}>
-              {loading ? 'Enviando...' : 'Reportar'}
+              {loading ? i18n.sending : i18n.report}
             </button>
           </div>
         </form>

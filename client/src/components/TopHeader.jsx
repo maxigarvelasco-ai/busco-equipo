@@ -8,6 +8,7 @@ export default function TopHeader() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const { theme, toggleTheme, language, setLanguage, t } = useUI();
+  const locale = language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : 'es-AR';
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
@@ -73,7 +74,7 @@ export default function TopHeader() {
 
     if (q.length < 2) {
       setSearchResults([]);
-      setSearchStatus('Escribi al menos 2 letras');
+      setSearchStatus(t('search_min_chars'));
       return;
     }
 
@@ -81,7 +82,6 @@ export default function TopHeader() {
       setSearching(true);
       setSearchStatus('');
       try {
-        const list = await profilesAPI.searchProfiles(q, user.id);
         const listGlobal = await profilesAPI.searchGlobal(q, user.id);
         setSearchResults(listGlobal || []);
         if (!listGlobal?.length) {
@@ -89,7 +89,7 @@ export default function TopHeader() {
         }
       } catch {
         setSearchResults([]);
-        setSearchStatus('No se pudo buscar ahora');
+        setSearchStatus(t('search_unavailable'));
       } finally {
         setSearching(false);
       }
@@ -108,9 +108,9 @@ export default function TopHeader() {
     try {
       await profilesAPI.addContact(profileId);
       setAddedContacts((prev) => ({ ...prev, [profileId]: true }));
-      setSearchStatus('Contacto agregado. Ya podes escribirle por mensaje directo.');
+      setSearchStatus(t('contact_added_status'));
     } catch {
-      setSearchStatus('No se pudo agregar el contacto');
+      setSearchStatus(t('contact_add_error'));
     } finally {
       setAddingContactId(null);
     }
@@ -224,6 +224,8 @@ export default function TopHeader() {
 
   return (
     <header className="top-header top-header-custom" ref={topActionsRef} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
+      {menuOpen && <button type="button" className="header-menu-backdrop" onClick={() => setMenuOpen(false)} aria-label={t('menu')} />}
+
       <div className="top-header-actions">
         <button
           type="button"
@@ -241,7 +243,9 @@ export default function TopHeader() {
         </button>
 
         {menuOpen && (
-          <div className="header-menu-panel">
+          <div className="header-menu-panel" role="dialog" aria-modal="true" aria-label={t('menu_title')}>
+            <div className="header-menu-title">{t('menu_title')}</div>
+
             <button className="btn btn-secondary btn-sm" type="button" onClick={toggleTheme}>
               {theme === 'dark' ? t('light_mode') : t('dark_mode')}
             </button>
@@ -366,11 +370,11 @@ export default function TopHeader() {
               ) : searchResults.length > 0 ? (
                 searchResults.map((p) => {
                   const added = !!addedContacts[p.entityId || p.id];
-                  const location = p.subtitle || 'Sin ubicacion';
+                  const location = p.subtitle || t('no_location');
                   return (
                     <div key={p.id} className="header-search-item">
                       <div>
-                        <div className="header-search-name">{p.name || 'Sin nombre'}</div>
+                        <div className="header-search-name">{p.name || t('no_name')}</div>
                         <div className="header-search-meta">{location}</div>
                       </div>
                       <div className="header-search-actions">
@@ -408,14 +412,14 @@ export default function TopHeader() {
             <div className="header-notif-head">
               <strong>{t('notifications')}</strong>
               <button className="btn btn-secondary btn-sm" type="button" onClick={() => navigate('/notifications')}>
-                Ver todas
+                {t('view_all')}
               </button>
             </div>
             <div className="header-notif-list">
               {notifLoading ? (
-                <div className="header-search-empty">Cargando...</div>
+                <div className="header-search-empty">{t('loading')}</div>
               ) : notifItems.length === 0 ? (
-                <div className="header-search-empty">No hay notificaciones</div>
+                <div className="header-search-empty">{t('no_notifications')}</div>
               ) : (
                 notifItems.slice(0, 8).map((n) => (
                   <button
@@ -424,8 +428,8 @@ export default function TopHeader() {
                     className={`header-notif-item ${n.is_read ? 'is-read' : ''}`}
                     onClick={() => handleNotifClick(n)}
                   >
-                    <div className="header-search-name">{n.message || n.content || 'Notificación'}</div>
-                    <div className="header-search-meta">{new Date(n.created_at).toLocaleString('es-AR')}</div>
+                    <div className="header-search-name">{n.message || n.content || t('notification_fallback')}</div>
+                    <div className="header-search-meta">{new Date(n.created_at).toLocaleString(locale)}</div>
                   </button>
                 ))
               )}

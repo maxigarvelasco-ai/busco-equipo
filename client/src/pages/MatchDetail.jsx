@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { matchesAPI } from '../services/api';
 import { supabase } from '../services/supabaseClient';
+import { useUI } from '../context/UIContext';
 
 function countryAbbrFromText(raw) {
   const text = String(raw || '').trim();
@@ -54,8 +55,105 @@ function formatLocation(address, city, zone) {
 export default function MatchDetail() {
   const { id } = useParams();
   const { user } = useAuth();
+  const { language } = useUI();
   const navigate = useNavigate();
   const { state } = useLocation();
+  const locale = language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : 'es-AR';
+  const i18n = {
+    es: {
+      delete_confirm: 'Seguro queres eliminar este partido? Esta accion no se puede deshacer.',
+      deleted: 'Partido eliminado',
+      delete_error: 'Error eliminando el partido',
+      not_found: 'Partido no encontrado',
+      back: 'Volver',
+      detail: 'Detalle del partido',
+      delete_match: 'Eliminar partido',
+      football: 'Futbol',
+      organize_by: 'Organiza',
+      players_missing_of: 'Faltan {missing} jugadores de {needed}',
+      tab_info: 'Informacion',
+      tab_chat: 'Chat',
+      tab_requests: 'Solicitudes',
+      players_title: 'Jugadores',
+      player_fallback: 'Jugador',
+      view_profile: 'Ver perfil',
+      no_players: 'Aun no hay jugadores confirmados.',
+      request_sent: 'Solicitud enviada',
+      request_error: 'Error al enviar solicitud',
+      already_joined: 'Ya estas unido',
+      pending_request: 'Solicitud pendiente',
+      request_join: 'Solicitar unirse',
+      no_messages: 'No hay mensajes aun.',
+      user_fallback: 'Usuario',
+      msg_ph: 'Escribe un mensaje...',
+      send: 'Enviar',
+      no_requests: 'No hay solicitudes pendientes.',
+      accept: 'Aceptar',
+      reject: 'Rechazar',
+    },
+    en: {
+      delete_confirm: 'Are you sure you want to delete this match? This action cannot be undone.',
+      deleted: 'Match deleted',
+      delete_error: 'Error deleting match',
+      not_found: 'Match not found',
+      back: 'Back',
+      detail: 'Match details',
+      delete_match: 'Delete match',
+      football: 'Football',
+      organize_by: 'Hosted by',
+      players_missing_of: '{missing} players needed out of {needed}',
+      tab_info: 'Info',
+      tab_chat: 'Chat',
+      tab_requests: 'Requests',
+      players_title: 'Players',
+      player_fallback: 'Player',
+      view_profile: 'View profile',
+      no_players: 'No confirmed players yet.',
+      request_sent: 'Request sent',
+      request_error: 'Error sending request',
+      already_joined: 'Already joined',
+      pending_request: 'Request pending',
+      request_join: 'Request to join',
+      no_messages: 'No messages yet.',
+      user_fallback: 'User',
+      msg_ph: 'Write a message...',
+      send: 'Send',
+      no_requests: 'No pending requests.',
+      accept: 'Accept',
+      reject: 'Reject',
+    },
+    pt: {
+      delete_confirm: 'Tem certeza que deseja excluir esta partida? Esta acao nao pode ser desfeita.',
+      deleted: 'Partida excluida',
+      delete_error: 'Erro ao excluir partida',
+      not_found: 'Partida nao encontrada',
+      back: 'Voltar',
+      detail: 'Detalhe da partida',
+      delete_match: 'Excluir partida',
+      football: 'Futebol',
+      organize_by: 'Organiza',
+      players_missing_of: 'Faltam {missing} jogadores de {needed}',
+      tab_info: 'Informacoes',
+      tab_chat: 'Chat',
+      tab_requests: 'Solicitacoes',
+      players_title: 'Jogadores',
+      player_fallback: 'Jogador',
+      view_profile: 'Ver perfil',
+      no_players: 'Ainda nao ha jogadores confirmados.',
+      request_sent: 'Solicitacao enviada',
+      request_error: 'Erro ao enviar solicitacao',
+      already_joined: 'Voce ja entrou',
+      pending_request: 'Solicitacao pendente',
+      request_join: 'Solicitar entrada',
+      no_messages: 'Ainda nao ha mensagens.',
+      user_fallback: 'Usuario',
+      msg_ph: 'Escreva uma mensagem...',
+      send: 'Enviar',
+      no_requests: 'Nao ha solicitacoes pendentes.',
+      accept: 'Aceitar',
+      reject: 'Rejeitar',
+    },
+  }[language];
 
   const [match, setMatch] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -184,19 +282,19 @@ export default function MatchDetail() {
   };
 
   const handleDelete = async () => {
-    if (!confirm('Seguro querés eliminar este partido? Esta acción no se puede deshacer.')) return;
+    if (!confirm(i18n.delete_confirm)) return;
     try {
       await matchesAPI.deleteMatch(id);
-      alert('Partido eliminado');
+      alert(i18n.deleted);
       navigate('/');
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Error eliminando el partido');
+      alert(err.message || i18n.delete_error);
     }
   };
 
   if (loading) return <div className="loading-spinner"><div className="spinner"></div></div>;
-  if (!match) return <div className="page-content">Partido no encontrado</div>;
+  if (!match) return <div className="page-content">{i18n.not_found}</div>;
 
   const toLocalDate = (dateStr) => {
     if (!dateStr) return new Date();
@@ -216,16 +314,16 @@ export default function MatchDetail() {
   return (
     <div className="page-content" style={{ paddingBottom: '80px' }}>
       <div className="page-header match-detail-header">
-        <button className="btn btn-sm btn-secondary" onClick={() => navigate(-1)}>Volver</button>
-        <h1 className="page-title">Detalle del Partido</h1>
-        {isCreator && <button className="btn btn-sm btn-danger" onClick={handleDelete}>Eliminar partido</button>}
+        <button className="btn btn-sm btn-secondary" onClick={() => navigate(-1)}>{i18n.back}</button>
+        <h1 className="page-title">{i18n.detail}</h1>
+        {isCreator && <button className="btn btn-sm btn-danger" onClick={handleDelete}>{i18n.delete_match}</button>}
       </div>
 
       <div className="card match-card" style={{ marginBottom: '1rem' }}>
         <div className="match-card-header">
           <div className="match-type">
             <span className="match-type-icon">⚽</span>
-            <span className="match-type-label">Fútbol {match.football_type}</span>
+            <span className="match-type-label">{i18n.football} {match.football_type}</span>
           </div>
           <span className="badge badge-type">F{match.football_type}</span>
         </div>
@@ -236,15 +334,15 @@ export default function MatchDetail() {
           </div>
           <div className="match-info-row">
             <span className="info-icon">📅</span>
-            <span>{toLocalDate(match.match_date).toLocaleDateString('es-AR')} {match.match_time?.slice(0,5)}</span>
+            <span>{toLocalDate(match.match_date).toLocaleDateString(locale)} {match.match_time?.slice(0,5)}</span>
           </div>
           <div className="match-info-row">
             <span className="info-icon">👤</span>
-            <span>Organiza: <strong>{match.creator_name}</strong></span>
+            <span>{i18n.organize_by}: <strong>{match.creator_name}</strong></span>
           </div>
           <div className="match-info-row">
             <span className="info-icon">👥</span>
-            <span><strong>Faltan {missingNeededPlayers} jugadores de {neededPlayers}</strong></span>
+            <span><strong>{i18n.players_missing_of.replace('{missing}', String(missingNeededPlayers)).replace('{needed}', String(neededPlayers))}</strong></span>
           </div>
           {match.description && (
              <div className="match-info-row" style={{ opacity: 0.7 }}>
@@ -259,18 +357,18 @@ export default function MatchDetail() {
         <button 
           onClick={() => setActiveTab('info')} 
           className={`match-detail-tab ${activeTab === 'info' ? 'active' : ''}`}>
-          Información
+          {i18n.tab_info}
         </button>
         <button 
           onClick={() => setActiveTab('chat')} 
           className={`match-detail-tab ${activeTab === 'chat' ? 'active' : ''}`}>
-          Chat
+          {i18n.tab_chat}
         </button>
         {isCreator && (
           <button 
             onClick={() => setActiveTab('requests')} 
             className={`match-detail-tab ${activeTab === 'requests' ? 'active' : ''}`}>
-            Solicitudes
+            {i18n.tab_requests}
             {joinRequests.length > 0 && <span className="match-detail-tab-badge">{joinRequests.length}</span>}
           </button>
         )}
@@ -278,16 +376,16 @@ export default function MatchDetail() {
 
       {activeTab === 'info' && (
         <div>
-          <h3>Jugadores · Faltan {missingNeededPlayers} jugadores de {neededPlayers}</h3>
+          <h3>{i18n.players_title} · {i18n.players_missing_of.replace('{missing}', String(missingNeededPlayers)).replace('{needed}', String(neededPlayers))}</h3>
           {players.length > 0 ? (
             <ul className="match-players-list">
               {players.map(p => (
                 <li key={p.user_id} className="card match-player-item">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-                    <strong>{p.profiles?.name || 'Jugador'}</strong>
+                    <strong>{p.profiles?.name || i18n.player_fallback}</strong>
                     {isCreator && (
                       <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/users/${p.user_id}`)}>
-                        Ver perfil
+                        {i18n.view_profile}
                       </button>
                     )}
                   </div>
@@ -295,7 +393,7 @@ export default function MatchDetail() {
               ))}
             </ul>
           ) : (
-            <p style={{ color: 'var(--color-text-muted)' }}>Aún no hay jugadores confirmados.</p>
+            <p style={{ color: 'var(--color-text-muted)' }}>{i18n.no_players}</p>
           )}
           
           {!isCreator && (
@@ -312,15 +410,15 @@ export default function MatchDetail() {
                     navigate('/support', { state: { openPolicy: 'abandon' } });
                   } else {
                     setHasRequested(true);
-                    alert('Solicitud enviada');
+                    alert(i18n.request_sent);
                   }
                 } catch (err) {
-                  alert('Error al enviar solicitud: ' + (err?.message || 'ver consola'));
+                  alert(`${i18n.request_error}: ${err?.message || ''}`);
                 }
               }}
               disabled={match.has_joined || hasRequested}
             >
-              {match.has_joined ? 'Ya estás unido' : (hasRequested ? 'Solicitud pendiente' : 'Solicitar Unirse')}
+              {match.has_joined ? i18n.already_joined : (hasRequested ? i18n.pending_request : i18n.request_join)}
             </button>
           )}
         </div>
@@ -330,11 +428,11 @@ export default function MatchDetail() {
         <div className="match-chat-panel">
           <div className="match-chat-messages">
             {messages.length === 0 ? (
-              <p className="match-chat-empty">No hay mensajes aun.</p>
+              <p className="match-chat-empty">{i18n.no_messages}</p>
             ) : (
               messages.map(msg => (
                 <div key={msg.id} className={`match-chat-message ${msg.user_id === user?.id ? 'mine' : ''}`}>
-                  <span className="match-chat-author">{msg.profiles?.name || 'Usuario'}</span>
+                  <span className="match-chat-author">{msg.profiles?.name || i18n.user_fallback}</span>
                   <div className={`match-chat-bubble ${msg.user_id === user?.id ? 'mine' : ''}`}>
                     {msg.message}
                   </div>
@@ -347,10 +445,10 @@ export default function MatchDetail() {
               type="text" 
               value={newMessage} 
               onChange={e => setNewMessage(e.target.value)}
-              placeholder="Escribe un mensaje..." 
+              placeholder={i18n.msg_ph}
               className="form-input" 
             />
-            <button type="submit" className="btn btn-primary">Enviar</button>
+            <button type="submit" className="btn btn-primary">{i18n.send}</button>
           </form>
         </div>
       )}
@@ -358,23 +456,23 @@ export default function MatchDetail() {
       {activeTab === 'requests' && isCreator && (
         <div>
           {joinRequests.length === 0 ? (
-            <p>No hay solicitudes pendientes.</p>
+            <p>{i18n.no_requests}</p>
           ) : (
             joinRequests.map(req => (
               <div key={req.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <div>
-                  <strong>{req.profiles?.name || 'Usuario'}</strong>
+                  <strong>{req.profiles?.name || i18n.user_fallback}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button 
                     className="btn btn-sm btn-primary" 
                     onClick={() => handleApprove(req.id, req.user_id)}
                     disabled={players.length >= match.max_players}
-                    title={players.length >= match.max_players ? 'El partido ya está lleno' : 'Aceptar jugador'}
+                    title={i18n.accept}
                   >
-                    Aceptar
+                    {i18n.accept}
                   </button>
-                  <button className="btn btn-sm btn-secondary" onClick={() => handleReject(req.id, req.user_id)}>Rechazar</button>
+                  <button className="btn btn-sm btn-secondary" onClick={() => handleReject(req.id, req.user_id)}>{i18n.reject}</button>
                 </div>
               </div>
             ))

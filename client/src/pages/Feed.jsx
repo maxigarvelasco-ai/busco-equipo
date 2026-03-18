@@ -5,26 +5,26 @@ import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 const FOOTBALL_TYPES = [
-  { key: 'all', label: 'Todos', value: null },
-  { key: 'futsal', label: 'Futsal', value: 5 },
-  { key: '5', label: 'F5', value: 5 },
-  { key: '7', label: 'F7', value: 7 },
-  { key: '9', label: 'F9', value: 9 },
-  { key: '11', label: 'F11', value: 11 },
+  { key: 'all', labelKey: 'all', value: null },
+  { key: 'futsal', labelKey: 'football_futsal', value: 5 },
+  { key: '5', labelKey: 'football_5', value: 5 },
+  { key: '7', labelKey: 'football_7', value: 7 },
+  { key: '9', labelKey: 'football_9', value: 9 },
+  { key: '11', labelKey: 'football_11', value: 11 },
 ];
 
 const REQUEST_TYPE_OPTIONS = [
-  { key: 'all', label: 'Todos', value: 'all' },
-  { key: 'Match', label: 'Partido', value: 'Match' },
-  { key: 'Tournament', label: 'Torneo', value: 'Tournament' },
-  { key: 'Club', label: 'Club', value: 'Club' },
+  { key: 'all', labelKey: 'all', value: 'all' },
+  { key: 'Match', labelKey: 'req_match', value: 'Match' },
+  { key: 'Tournament', labelKey: 'req_tournament', value: 'Tournament' },
+  { key: 'Club', labelKey: 'req_club', value: 'Club' },
 ];
 
 const GENDER_FILTERS = [
-  { key: 'all', label: 'Todos', value: 'all' },
-  { key: 'masculino', label: 'Masculino', value: 'masculino' },
-  { key: 'femenino', label: 'Femenino', value: 'femenino' },
-  { key: 'mixto', label: 'Mixto', value: 'mixto' },
+  { key: 'all', labelKey: 'all', value: 'all' },
+  { key: 'masculino', labelKey: 'gender_male', value: 'masculino' },
+  { key: 'femenino', labelKey: 'gender_female', value: 'femenino' },
+  { key: 'mixto', labelKey: 'gender_mixed', value: 'mixto' },
 ];
 
 function toLocalDate(dateStr) {
@@ -43,17 +43,18 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return 2 * r * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function formatWhen(date, time) {
+function formatWhen(date, time, language, t) {
   const d = toLocalDate(date);
   const today = new Date();
   const baseToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const baseDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const locale = language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : 'es-AR';
   const diffDays = Math.round((baseDate - baseToday) / (1000 * 60 * 60 * 24));
   const hhmm = time ? String(time).slice(0, 5) : null;
 
-  if (diffDays === 0) return hhmm ? `Hoy ${hhmm}` : 'Hoy';
-  if (diffDays === 1) return hhmm ? `Mañana ${hhmm}` : 'Mañana';
-  return hhmm ? `${baseDate.toLocaleDateString('es-AR')} ${hhmm}` : baseDate.toLocaleDateString('es-AR');
+  if (diffDays === 0) return hhmm ? `${t('today')} ${hhmm}` : t('today');
+  if (diffDays === 1) return hhmm ? `${t('tomorrow')} ${hhmm}` : t('tomorrow');
+  return hhmm ? `${baseDate.toLocaleDateString(locale)} ${hhmm}` : baseDate.toLocaleDateString(locale);
 }
 
 function computeAgeFromBirthDate(birthDate) {
@@ -108,7 +109,7 @@ function formatLocation(address, city, zone) {
     ? addressText.split(',').map((p) => p.trim()).filter(Boolean)
     : [];
 
-  const street = parts[0] || zoneText || cityText || 'Sin ubicacion';
+  const street = parts[0] || zoneText || cityText || '';
   const countryRaw = parts.length > 1 ? parts[parts.length - 1] : '';
   const country = countryAbbrFromText(countryRaw);
 
@@ -116,7 +117,7 @@ function formatLocation(address, city, zone) {
     ? cityText
     : (parts.length > 1 ? parts.find((p) => p !== street && p !== countryRaw) || '' : '');
 
-  const compact = [street];
+  const compact = [street].filter(Boolean);
   if (finalCity && finalCity.toLowerCase() !== street.toLowerCase()) compact.push(finalCity);
   if (country && country.toLowerCase() !== finalCity.toLowerCase()) compact.push(country);
   return compact.filter(Boolean).join(', ');
@@ -147,7 +148,7 @@ function matchesProfileRestrictions(item, profile) {
 
 export default function Feed() {
   const { user, profile } = useAuth();
-  const { t } = useUI();
+  const { t, language } = useUI();
   const navigate = useNavigate();
   const [matches, setMatches] = useState([]);
   const [tournaments, setTournaments] = useState([]);
@@ -166,11 +167,10 @@ export default function Feed() {
   const filtersWrapRef = useRef(null);
 
   const buildNeedLabel = (joined, needed) => {
-    const joinedNum = Math.max(Number(joined || 0), 0);
     const neededNum = Math.max(Number(needed || 0), 0);
-    const missing = Math.max(neededNum - joinedNum, 0);
-    if (missing === 1) return 'Falta 1 jugador';
-    return `Faltan ${missing} jugadores`;
+    const missing = Math.max(neededNum - Math.max(Number(joined || 0), 0), 0);
+    if (missing === 1) return t('need_one_player');
+    return t('need_many_players').replace('{count}', String(missing));
   };
 
   const buildSlotsVisual = (joined, needed) => {
@@ -187,7 +187,7 @@ export default function Feed() {
       missingSlots,
       hiddenSlots,
       visibleSlots,
-      missingLabel: missingSlots === 1 ? 'Falta 1 jugador' : `Faltan ${missingSlots} jugadores`,
+      missingLabel: missingSlots === 1 ? t('need_one_player') : t('need_many_players').replace('{count}', String(missingSlots)),
     };
   };
 
@@ -235,11 +235,11 @@ export default function Feed() {
       setError(null);
     } catch (err) {
       console.error('Error loading matches:', err);
-      setError('No se pudieron cargar los partidos.');
+      setError(t('could_not_load_matches'));
     } finally {
       setIsLoading(false);
     }
-  }, [selectedFootballType, user]);
+  }, [selectedFootballType, user, t]);
 
   useEffect(() => {
     if (!filtersOpen) return;
@@ -298,48 +298,48 @@ export default function Feed() {
     try {
       const res = await matchesAPI.requestJoin(matchId);
       if (res?.alreadyRequested) {
-        showToast('Revisá las políticas de la app para este caso', 'error');
+        showToast(t('app_policy_hint'), 'error');
         navigate('/support', { state: { openPolicy: 'abandon' } });
       } else if (res?.blockedByAbandon) {
-        showToast('Aplican políticas por abandono cercano al horario', 'error');
+        showToast(t('abandon_policy_hint'), 'error');
         navigate('/support', { state: { openPolicy: 'abandon' } });
       } else {
-        showToast('¡Solicitud enviada! 🎉');
+        showToast(t('request_sent'));
       }
       loadMatches(false);
     } catch (err) {
-      showToast(err.message || 'Error al solicitar unirse', 'error');
+      showToast(err.message || t('join_error'), 'error');
     }
   };
 
   const handleLeave = async (matchId) => {
     try {
       await matchesAPI.leave(matchId);
-      showToast('Saliste del partido');
+      showToast(t('left_match'));
       loadMatches(false);
     } catch (err) {
-      showToast(err.message || 'Error al salir', 'error');
+      showToast(err.message || t('leave_error'), 'error');
     }
   };
 
   const handleCancel = async (matchId) => {
     try {
       await matchesAPI.cancelRequest(matchId);
-      showToast('Solicitud cancelada');
+      showToast(t('request_cancelled'));
       loadMatches(false);
     } catch (err) {
-      showToast(err.message || 'Error al cancelar solicitud', 'error');
+      showToast(err.message || t('cancel_request_error'), 'error');
     }
   };
 
   const handleDelete = async (matchId) => {
-    if (!confirm('Seguro queres eliminar este partido?')) return;
+    if (!confirm(t('confirm_delete_match'))) return;
     try {
       await matchesAPI.deleteMatch(matchId);
-      showToast('Partido eliminado');
+      showToast(t('match_deleted'));
       loadMatches(false);
     } catch (err) {
-      showToast(err.message || 'Error al eliminar partido', 'error');
+      showToast(err.message || t('delete_match_error'), 'error');
     }
   };
 
@@ -347,20 +347,20 @@ export default function Feed() {
     if (!user) { navigate('/login'); return; }
     try {
       await tournamentsAPI.applyRequest(tournamentId);
-      showToast('Postulacion enviada');
+      showToast(t('application_sent'));
     } catch (err) {
-      showToast(err.message || 'Error al postularse', 'error');
+      showToast(err.message || t('application_error'), 'error');
     }
   };
 
   const handleDeleteClubRecruitment = async (recruitmentId) => {
-    if (!confirm('Seguro queres eliminar esta búsqueda de jugadores del club?')) return;
+    if (!confirm(t('confirm_delete_club_request'))) return;
     try {
       await clubsAPI.deleteRecruitment(recruitmentId);
-      showToast('Petición de club eliminada');
+      showToast(t('club_request_deleted'));
       loadMatches(false);
     } catch (err) {
-      showToast(err.message || 'No se pudo eliminar la petición', 'error');
+      showToast(err.message || t('delete_club_request_error'), 'error');
     }
   };
 
@@ -386,7 +386,7 @@ export default function Feed() {
         total: m.max_players,
         needed_players: Math.max((m.max_players || 1) - 1, 1),
         joined_needed_players: Math.max((m.players_joined ?? m.current_players ?? 0) - 1, 0),
-        organizer_name: m.creator_name || 'Anónimo',
+        organizer_name: m.creator_name || null,
         organizer_id: m.owner_id ?? m.creator_id ?? null,
         raw: m,
         distanceKm,
@@ -411,7 +411,7 @@ export default function Feed() {
       time: null,
       joined: null,
       total: null,
-      organizer_name: t.organizer_name || 'Anónimo',
+      organizer_name: t.organizer_name || null,
       raw: t,
       distanceKm: null,
       match_gender: t.match_gender || 'mixto',
@@ -436,7 +436,7 @@ export default function Feed() {
       time: null,
       joined: null,
       total: null,
-      organizer_name: c.clubs?.name || 'Club',
+      organizer_name: c.clubs?.name || null,
       organizer_id: c.clubs?.creator_id || null,
       raw: c,
       distanceKm: null,
@@ -484,25 +484,29 @@ export default function Feed() {
   const activeFilterChips = [];
   if (selectedFootballType !== 'all') {
     const f = FOOTBALL_TYPES.find((x) => x.key === selectedFootballType);
-    if (f) activeFilterChips.push(`Fútbol: ${f.label}`);
+    if (f) activeFilterChips.push(`${t('filter_chip_football')}: ${t(f.labelKey)}`);
   }
   if (selectedRequestType !== 'all') {
-    const t = REQUEST_TYPE_OPTIONS.find((x) => x.value === selectedRequestType);
-    if (t) activeFilterChips.push(`Tipo: ${t.label}`);
+    const requestType = REQUEST_TYPE_OPTIONS.find((x) => x.value === selectedRequestType);
+    if (requestType) activeFilterChips.push(`${t('filter_chip_type')}: ${t(requestType.labelKey)}`);
   }
   if (selectedGender !== 'all') {
-    const g = GENDER_FILTERS.find((x) => x.value === selectedGender);
-    if (g) activeFilterChips.push(`Género: ${g.label}`);
+    const gender = GENDER_FILTERS.find((x) => x.value === selectedGender);
+    if (gender) activeFilterChips.push(`${t('filter_chip_gender')}: ${t(gender.labelKey)}`);
   }
 
   const getRequestCardTitle = (req) => {
     if (req.kind === 'Match') {
-      return String(req.raw?.match_kind || '').toLowerCase() === 'futsal' ? 'Partido Futsal' : `Partido F${req.football_type || '-'}`;
+      return String(req.raw?.match_kind || '').toLowerCase() === 'futsal'
+        ? t('futsal_match_title')
+        : t('match_title').replace('{type}', String(req.football_type || '-'));
     }
     if (req.kind === 'Tournament') {
-      return req.raw?.name || `Torneo F${req.football_type || '-'}`;
+      return req.raw?.name || t('tournament_title').replace('{type}', String(req.football_type || '-'));
     }
-    return req.organizer_name ? `Búsqueda de jugadores · ${req.organizer_name}` : 'Búsqueda de jugadores · Club';
+    return req.organizer_name
+      ? t('club_recruitment_title').replace('{name}', req.organizer_name)
+      : t('club_recruitment_title_generic');
   };
 
   return (
@@ -523,12 +527,12 @@ export default function Feed() {
             </button>
             {filtersOpen && (
               <>
-                <button className="feed-filters-backdrop" type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros" />
-                <div className="feed-filters-panel card" role="dialog" aria-modal="true" aria-label="Filtros de publicaciones">
-                  <h3>Filtros</h3>
+                <button className="feed-filters-backdrop" type="button" onClick={() => setFiltersOpen(false)} aria-label={t('close_filters')} />
+                <div className="feed-filters-panel card" role="dialog" aria-modal="true" aria-label={t('filters_dialog')}>
+                  <h3>{t('filters')}</h3>
 
                   <div className="feed-filter-section">
-                    <div className="feed-filter-label">Tipo de fútbol</div>
+                    <div className="feed-filter-label">{t('filter_football_type')}</div>
                     <div className="feed-filter-options">
                       {FOOTBALL_TYPES.filter((f) => f.key !== 'all').map((f) => (
                         <button
@@ -537,30 +541,30 @@ export default function Feed() {
                           className={`area-pill ${draftFootballType === f.key ? 'active' : ''}`}
                           onClick={() => setDraftFootballType(f.key)}
                         >
-                          {f.label}
+                          {t(f.labelKey)}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="feed-filter-section">
-                    <div className="feed-filter-label">Tipo</div>
+                    <div className="feed-filter-label">{t('filter_request_type')}</div>
                     <div className="feed-filter-options">
-                      {REQUEST_TYPE_OPTIONS.filter((t) => t.value !== 'all').map((t) => (
+                      {REQUEST_TYPE_OPTIONS.filter((requestTypeOption) => requestTypeOption.value !== 'all').map((requestTypeOption) => (
                         <button
-                          key={t.key}
+                          key={requestTypeOption.key}
                           type="button"
-                          className={`area-pill ${draftRequestType === t.value ? 'active' : ''}`}
-                          onClick={() => setDraftRequestType(t.value)}
+                          className={`area-pill ${draftRequestType === requestTypeOption.value ? 'active' : ''}`}
+                          onClick={() => setDraftRequestType(requestTypeOption.value)}
                         >
-                          {t.label}
+                          {t(requestTypeOption.labelKey)}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="feed-filter-section">
-                    <div className="feed-filter-label">Género</div>
+                    <div className="feed-filter-label">{t('filter_gender')}</div>
                     <div className="feed-filter-options">
                       {GENDER_FILTERS.filter((g) => g.value !== 'all').map((g) => (
                         <button
@@ -569,15 +573,15 @@ export default function Feed() {
                           className={`area-pill ${draftGender === g.value ? 'active' : ''}`}
                           onClick={() => setDraftGender(g.value)}
                         >
-                          {g.label}
+                          {t(g.labelKey)}
                         </button>
                       ))}
                     </div>
                   </div>
 
                   <div className="feed-filter-actions">
-                    <button className="btn btn-primary" type="button" onClick={applyFilters}>Aplicar filtros</button>
-                    <button className="btn btn-secondary" type="button" onClick={clearFilters}>Limpiar filtros</button>
+                    <button className="btn btn-primary" type="button" onClick={applyFilters}>{t('apply_filters')}</button>
+                    <button className="btn btn-secondary" type="button" onClick={clearFilters}>{t('clear_filters')}</button>
                   </div>
                 </div>
               </>
@@ -587,8 +591,8 @@ export default function Feed() {
             <button
               className="btn btn-secondary btn-sm"
               type="button"
-              title="Agregá cancha, horarios, disponibilidad y servicios."
-              aria-label="Canchas: agregá cancha, horarios, disponibilidad y servicios"
+              title={t('courts_hint')}
+              aria-label={`${t('courts')}: ${t('courts_hint')}`}
               onClick={() => navigate('/venues')}
             >
               {t('courts')}
@@ -619,12 +623,12 @@ export default function Feed() {
       ) : requests.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">⚽</div>
-          <div className="empty-state-title">No hay solicitudes compatibles para tu perfil</div>
+          <div className="empty-state-title">{t('empty_feed_title')}</div>
           <p style={{ marginBottom: '1.5rem', color: 'var(--color-text-muted)' }}>
-            Probá otro filtro o creá una solicitud nueva
+            {t('empty_feed_subtitle')}
           </p>
           <button className="btn btn-primary" onClick={() => navigate(user ? '/create-match' : '/login')}>
-            Buscar jugadores
+            {t('search_players')}
           </button>
         </div>
       ) : (
@@ -648,19 +652,19 @@ export default function Feed() {
                 <h3 className="match-card-title">{getRequestCardTitle(req)}</h3>
               </div>
               <div className="match-badges-compact">
-                <span className="badge badge-type match-badge-soft">{req.kind === 'Club' ? 'Club' : `F${req.football_type || '-'}`}</span>
-                <span className="badge badge-type match-badge-soft">{req.match_gender || 'mixto'}</span>
+                <span className="badge badge-type match-badge-soft">{req.kind === 'Club' ? t('req_club') : `F${req.football_type || '-'}`}</span>
+                <span className="badge badge-type match-badge-soft">{req.match_gender === 'masculino' ? t('gender_male') : req.match_gender === 'femenino' ? t('gender_female') : t('gender_mixed')}</span>
               </div>
             </div>
 
             <div className="match-info">
               <div className="match-info-row">
                 <span className="info-icon">📍</span>
-                <span>{req.locationLabel || 'Sin ubicacion'}</span>
+                <span>{req.locationLabel || t('no_location')}</span>
               </div>
               <div className="match-info-row">
                 <span className="info-icon">🕒</span>
-                <span>{formatWhen(req.date, req.time)}</span>
+                <span>{formatWhen(req.date, req.time, language, t)}</span>
               </div>
               <div className="match-info-row">
                 <span className="info-icon">👤</span>
@@ -673,10 +677,10 @@ export default function Feed() {
                       navigate(`/users/${req.organizer_id}`);
                     }}
                   >
-                    Organiza: {req.organizer_name || 'Anónimo'}
+                    {t('organize_by')}: {req.organizer_name || t('anonymous')}
                   </button>
                 ) : (
-                  <span>Organiza: {req.organizer_name || 'Anónimo'}</span>
+                  <span>{t('organize_by')}: {req.organizer_name || t('anonymous')}</span>
                 )}
               </div>
               {req.kind === 'Match' ? (
@@ -686,8 +690,8 @@ export default function Feed() {
                     <div className="match-cupos-inline-wrap">
                       <div className="match-info-row match-cupos-inline">
                       <span className="info-icon">👥</span>
-                      <span className="match-cupos-label">Cupos:</span>
-                      <span className="match-slots-track-inline" role="img" aria-label={`${slots.filledSlots} cupos cubiertos de ${slots.totalSlots}`}>
+                      <span className="match-cupos-label">{t('slots')}:</span>
+                      <span className="match-slots-track-inline" role="img" aria-label={`${slots.filledSlots}/${slots.totalSlots}`}>
                         {slots.visibleSlots.map((state, idx) => (
                           <span key={`slot-${req.id}-${idx}`} className={`match-slot-inline ${state === 'filled' ? 'is-filled' : 'is-empty'}`}>
                             {state === 'filled' ? '●' : '○'}
@@ -697,7 +701,7 @@ export default function Feed() {
                       </span>
                       <span className="match-cupos-text">
                         {slots.missingLabel}
-                        {req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
+                        {req.goalkeepers_needed > 0 ? ` · ${(req.goalkeepers_needed === 1 ? t('goalkeepers_needed') : t('goalkeepers_needed_plural')).replace('{count}', String(req.goalkeepers_needed))}` : ''}
                       </span>
                       </div>
                     </div>
@@ -707,12 +711,12 @@ export default function Feed() {
                 <>
                   <div className="match-info-row">
                     <span className="info-icon">🎯</span>
-                    <span>{req.position_needed ? `Buscan ${req.position_needed}` : 'Búsqueda abierta de jugadores'}</span>
+                    <span>{req.position_needed ? t('looking_for_position').replace('{position}', req.position_needed) : t('open_recruitment')}</span>
                   </div>
                   {req.club_contact_name && (
                     <div className="match-info-row">
                       <span className="info-icon">🙋</span>
-                      <span>Contacto: {req.club_contact_name}</span>
+                      <span>{t('contact_person')}: {req.club_contact_name}</span>
                     </div>
                   )}
                   {req.club_address && (
@@ -747,7 +751,7 @@ export default function Feed() {
               {req.kind === 'Match' && req.distanceKm != null && (
                 <div className="match-info-row">
                   <span className="info-icon">📏</span>
-                  <span>{req.distanceKm.toFixed(1)} km de vos</span>
+                  <span>{t('km_from_you').replace('{km}', req.distanceKm.toFixed(1))}</span>
                 </div>
               )}
             </div>
@@ -766,10 +770,10 @@ export default function Feed() {
                     return (
                       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         <button className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); navigate(`/match/${req.id}`); }}>
-                          Editar
+                          {t('edit')}
                         </button>
                         <button className="btn btn-sm btn-danger" onClick={(e) => { e.stopPropagation(); handleDelete(req.id); }}>
-                          Eliminar
+                          {t('delete')}
                         </button>
                       </div>
                     );
@@ -778,7 +782,7 @@ export default function Feed() {
                   if (m.has_joined) {
                     return (
                       <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleLeave(req.id); }}>
-                        Salir
+                        {t('leave')}
                       </button>
                     );
                   }
@@ -786,13 +790,13 @@ export default function Feed() {
                   if (m.has_requested) {
                     return (
                       <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleCancel(req.id); }}>
-                        Cancelar solicitud
+                        {t('cancel_request')}
                       </button>
                     );
                   }
 
                   if (isFull) {
-                    return <span className="badge badge-full">Completo</span>;
+                    return <span className="badge badge-full">{t('full')}</span>;
                   }
 
                   return (
@@ -816,11 +820,11 @@ export default function Feed() {
                       }
                     }}
                   >
-                    Ver club
+                    {t('view_club')}
                   </button>
                   {user?.id && req.raw?.clubs?.creator_id && String(user.id) === String(req.raw.clubs.creator_id) && (
                     <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); handleDeleteClubRecruitment(req.id); }}>
-                      Eliminar petición
+                      {t('delete_request')}
                     </button>
                   )}
                 </div>

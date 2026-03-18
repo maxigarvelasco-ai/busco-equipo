@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { notificationsAPI, matchesAPI } from '../services/api';
 import { supabase } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { useUI } from '../context/UIContext';
 
 // Icons for different notification types
 const notificationIcons = {
@@ -27,11 +28,60 @@ const notificationIcons = {
 
 
 export default function Notifications() {
+  const { language } = useUI();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processingNotifId, setProcessingNotifId] = useState(null);
   const [expandedNotifId, setExpandedNotifId] = useState(null);
   const navigate = useNavigate();
+  const locale = language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : 'es-AR';
+  const i18n = {
+    es: {
+      title: 'Notificaciones',
+      mark_all: 'Marcar todas como leidas',
+      empty: 'No tienes notificaciones',
+      handled: 'Solicitud procesada',
+      accept: 'Aceptar',
+      reject: 'Rechazar',
+      missing_data: 'Faltan datos para procesar la solicitud.',
+      missing_data_long: 'Faltan datos de la solicitud para procesar (requestId/matchId/userId)',
+      no_action: 'Sin accion disponible',
+      open_chat: 'Abrir chat',
+      view: 'Ver',
+      process_error: 'Error al procesar la solicitud',
+      console_fallback: 'ver consola',
+    },
+    en: {
+      title: 'Notifications',
+      mark_all: 'Mark all as read',
+      empty: 'You have no notifications',
+      handled: 'Request processed',
+      accept: 'Accept',
+      reject: 'Reject',
+      missing_data: 'Missing data to process this request.',
+      missing_data_long: 'Missing request data (requestId/matchId/userId)',
+      no_action: 'No action available',
+      open_chat: 'Open chat',
+      view: 'View',
+      process_error: 'Error processing request',
+      console_fallback: 'check console',
+    },
+    pt: {
+      title: 'Notificacoes',
+      mark_all: 'Marcar todas como lidas',
+      empty: 'Voce nao tem notificacoes',
+      handled: 'Solicitacao processada',
+      accept: 'Aceitar',
+      reject: 'Rejeitar',
+      missing_data: 'Faltam dados para processar esta solicitacao.',
+      missing_data_long: 'Faltam dados da solicitacao (requestId/matchId/userId)',
+      no_action: 'Sem acao disponivel',
+      open_chat: 'Abrir chat',
+      view: 'Ver',
+      process_error: 'Erro ao processar solicitacao',
+      console_fallback: 'veja o console',
+    },
+  }[language];
 
   useEffect(() => {
     loadNotifications();
@@ -179,7 +229,7 @@ export default function Notifications() {
     if (!requestId || !matchId || !userId) {
       console.error('Notification data is missing required fields for this action. notif id=', notif.id, notif.data);
       // mark notification with an error so UI shows a helpful message instead of an alert
-      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, errorMessage: 'Faltan datos para procesar la solicitud.' } : n));
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, errorMessage: i18n.missing_data } : n));
       return;
     }
 
@@ -199,7 +249,7 @@ export default function Notifications() {
       console.log('Request action success', { action, requestId });
     } catch (err) {
       console.error(`Failed to ${action} request`, err);
-      alert('Error al procesar la solicitud: ' + (err?.message || err?.details || 'ver consola'));
+      alert(`${i18n.process_error}: ${err?.message || err?.details || i18n.console_fallback}`);
     } finally {
       setProcessingNotifId(null);
     }
@@ -215,14 +265,14 @@ export default function Notifications() {
   return (
     <div className="page-content">
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 className="page-title">Notificaciones</h1>
-        <button className="btn btn-sm btn-secondary" onClick={handleMarkAllRead}>Marcar todas como leídas</button>
+        <h1 className="page-title">{i18n.title}</h1>
+        <button className="btn btn-sm btn-secondary" onClick={handleMarkAllRead}>{i18n.mark_all}</button>
       </div>
 
       {notifications.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📭</div>
-          <div className="empty-state-title">No tienes notificaciones</div>
+          <div className="empty-state-title">{i18n.empty}</div>
         </div>
       ) : (
         <div className="notification-list">
@@ -243,7 +293,7 @@ export default function Notifications() {
               <div className="notification-content">
                 <p>{notif.message || notif.content}</p>
                 <span className="notification-date">
-                  {new Date(notif.created_at).toLocaleString()}
+                  {new Date(notif.created_at).toLocaleString(locale)}
                 </span>
                 
                 {expandedNotifId === notif.id && (
@@ -255,23 +305,23 @@ export default function Notifications() {
                         {(notif.type === 'join_request_received' || notif.type === 'match_join_request') ? (
                           <>
                             {notif.handled ? (
-                              <div className="notif-handled">Solicitud procesada</div>
+                              <div className="notif-handled">{i18n.handled}</div>
                             ) : (
                               <>
                                 <button
                                   className="btn btn-sm btn-primary"
                                   onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'accept'); }}
                                   disabled={processingNotifId === notif.id}
-                                >Aceptar</button>
+                                >{i18n.accept}</button>
                                 <button
                                   className="btn btn-sm btn-danger"
                                   onClick={(e) => { e.stopPropagation(); handleRequestAction(notif, 'reject'); }}
                                   disabled={processingNotifId === notif.id}
-                                >Rechazar</button>
+                                >{i18n.reject}</button>
                               </>
                             )}
                                 {!(notif.parsedData && (notif.parsedData.requestId || notif.parsedData.matchId || notif.parsedData.userId)) && (
-                              <div className="notif-no-action">Faltan datos de la solicitud para procesar (requestId/matchId/userId)</div>
+                              <div className="notif-no-action">{i18n.missing_data_long}</div>
                             )}
                             {notif.errorMessage && (
                               <div className="notif-error" style={{ color: 'orange', marginTop: '0.5rem' }}>{notif.errorMessage}</div>
@@ -285,16 +335,16 @@ export default function Notifications() {
                                 <button
                                   className="btn btn-sm btn-primary"
                                   onClick={(e) => { e.stopPropagation(); navigate(path, { state: { openTab: 'chat' } }); }}
-                                >Abrir chat</button>
+                                >{i18n.open_chat}</button>
                               ) : (
                                 <button
                                   className="btn btn-sm btn-primary"
                                   onClick={(e) => { e.stopPropagation(); navigate(path); }}
-                                >Ver</button>
+                                >{i18n.view}</button>
                               )}
                             </>
                           ) : (
-                            <div className="notif-no-action">Sin acción disponible</div>
+                            <div className="notif-no-action">{i18n.no_action}</div>
                           )
                         )}
                       </>
