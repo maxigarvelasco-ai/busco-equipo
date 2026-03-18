@@ -4,15 +4,27 @@ import { clubsAPI, matchesAPI, tournamentsAPI } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 const FOOTBALL_TYPES = [
-  { key: 'Todas', label: 'Todo futbol', value: null },
+  { key: 'all', label: 'Todos', value: null },
   { key: 'futsal', label: 'Futsal', value: 5 },
   { key: '5', label: 'F5', value: 5 },
   { key: '7', label: 'F7', value: 7 },
   { key: '9', label: 'F9', value: 9 },
   { key: '11', label: 'F11', value: 11 },
 ];
-const REQUEST_TYPES = ['Todas', 'Match', 'Tournament', 'Club'];
-const GENDER_FILTERS = ['Todos', 'Masculino', 'Femenino', 'Mixto'];
+
+const REQUEST_TYPE_OPTIONS = [
+  { key: 'all', label: 'Todos', value: 'all' },
+  { key: 'Match', label: 'Partido', value: 'Match' },
+  { key: 'Tournament', label: 'Torneo', value: 'Tournament' },
+  { key: 'Club', label: 'Club', value: 'Club' },
+];
+
+const GENDER_FILTERS = [
+  { key: 'all', label: 'Todos', value: 'all' },
+  { key: 'masculino', label: 'Masculino', value: 'masculino' },
+  { key: 'femenino', label: 'Femenino', value: 'femenino' },
+  { key: 'mixto', label: 'Mixto', value: 'mixto' },
+];
 
 function toLocalDate(dateStr) {
   const [y, m, d] = String(dateStr || '').split('-').map(Number);
@@ -140,17 +152,35 @@ export default function Feed() {
   const [clubRecruitments, setClubRecruitments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedFootballType, setSelectedFootballType] = useState('Todas');
-  const [selectedRequestType, setSelectedRequestType] = useState('Todas');
-  const [selectedGender, setSelectedGender] = useState('Todos');
+  const [selectedFootballType, setSelectedFootballType] = useState('all');
+  const [selectedRequestType, setSelectedRequestType] = useState('all');
+  const [selectedGender, setSelectedGender] = useState('all');
   const [toast, setToast] = useState(null);
   const [coords, setCoords] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [draftFootballType, setDraftFootballType] = useState('all');
+  const [draftRequestType, setDraftRequestType] = useState('all');
+  const [draftGender, setDraftGender] = useState('all');
+  const [venueMenuOpen, setVenueMenuOpen] = useState(false);
 
   const buildNeedLabel = (joined, needed) => {
     const joinedNum = Math.max(Number(joined || 0), 0);
     const neededNum = Math.max(Number(needed || 0), 0);
     const missing = Math.max(neededNum - joinedNum, 0);
     return `Faltan ${missing} jugadores de ${neededNum}`;
+  };
+
+  const buildSlotsVisual = (joined, needed) => {
+    const totalSlots = Math.max(Number(needed || 0), 1);
+    const filledSlots = Math.min(Math.max(Number(joined || 0), 0), totalSlots);
+    const missingSlots = Math.max(totalSlots - filledSlots, 0);
+
+    return {
+      totalSlots,
+      filledSlots,
+      missingSlots,
+      missingLabel: missingSlots === 1 ? 'Falta 1 jugador' : `Faltan ${missingSlots} jugadores`,
+    };
   };
 
   const loadMatches = useCallback(async (showSpinner = false) => {
@@ -186,6 +216,13 @@ export default function Feed() {
   }, [selectedFootballType, user]);
 
   useEffect(() => {
+    if (!filtersOpen) return;
+    setDraftFootballType(selectedFootballType);
+    setDraftRequestType(selectedRequestType);
+    setDraftGender(selectedGender);
+  }, [filtersOpen, selectedFootballType, selectedRequestType, selectedGender]);
+
+  useEffect(() => {
     loadMatches(true);
   }, [loadMatches]);
 
@@ -201,6 +238,22 @@ export default function Feed() {
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const applyFilters = () => {
+    setSelectedFootballType(draftFootballType);
+    setSelectedRequestType(draftRequestType);
+    setSelectedGender(draftGender);
+    setFiltersOpen(false);
+  };
+
+  const clearFilters = () => {
+    setDraftFootballType('all');
+    setDraftRequestType('all');
+    setDraftGender('all');
+    setSelectedFootballType('all');
+    setSelectedRequestType('all');
+    setSelectedGender('all');
   };
 
   const handleJoin = async (matchId) => {
@@ -369,7 +422,7 @@ export default function Feed() {
 
     merged = merged.filter((row) => matchesProfileRestrictions(row, profile));
 
-    if (selectedRequestType !== 'Todas') {
+    if (selectedRequestType !== 'all') {
       merged = merged.filter((row) => row.kind === selectedRequestType);
     }
 
@@ -377,9 +430,8 @@ export default function Feed() {
       merged = merged.filter((row) => row.football_type === 5 && String(row.raw?.match_kind || '').toLowerCase() === 'futsal');
     }
 
-    if (selectedGender !== 'Todos') {
-      const normalizedGender = selectedGender.toLowerCase();
-      merged = merged.filter((row) => (row.match_gender || 'mixto') === normalizedGender);
+    if (selectedGender !== 'all') {
+      merged = merged.filter((row) => (row.match_gender || 'mixto') === selectedGender);
     }
 
     return merged.sort((a, b) => {
@@ -392,51 +444,147 @@ export default function Feed() {
 
   const requests = normalizeRequests();
 
+  const activeFilterChips = [];
+  if (selectedFootballType !== 'all') {
+    const f = FOOTBALL_TYPES.find((x) => x.key === selectedFootballType);
+    if (f) activeFilterChips.push(`Futbol: ${f.label}`);
+  }
+  if (selectedRequestType !== 'all') {
+    const t = REQUEST_TYPE_OPTIONS.find((x) => x.value === selectedRequestType);
+    if (t) activeFilterChips.push(`Publicacion: ${t.label}`);
+  }
+  if (selectedGender !== 'all') {
+    const g = GENDER_FILTERS.find((x) => x.value === selectedGender);
+    if (g) activeFilterChips.push(`Genero: ${g.label}`);
+  }
+
+  const getRequestCardTitle = (req) => {
+    if (req.kind === 'Match') {
+      return String(req.raw?.match_kind || '').toLowerCase() === 'futsal'
+        ? 'Partido de futsal'
+        : `Partido de futbol ${req.football_type || '-'}`;
+    }
+    if (req.kind === 'Tournament') {
+      return req.raw?.name || `Torneo de futbol ${req.football_type || '-'}`;
+    }
+    return req.organizer_name ? `Busqueda de jugadores para ${req.organizer_name}` : 'Busqueda de jugadores para club';
+  };
+
   return (
     <div className="page-content">
       {toast && (
         <div className={`toast toast-${toast.type}`}>{toast.message}</div>
       )}
 
-      <div className="page-header">
-        <h1 className="page-title">Solicitudes de futbol</h1>
+      <div className="feed-hero card">
+        <div className="feed-hero-head">
+          <div>
+            <h1 className="feed-hero-title">¿Tenes ganas de jugar?</h1>
+            <p className="feed-hero-subtitle">Encontra partidos, torneos o un club y sumate en segundos.</p>
+            <p className="feed-hero-help">Elegi una publicacion y toca "Quiero sumarme" para enviar tu solicitud.</p>
+          </div>
+          <div className="feed-venue-menu-wrap">
+            <button className="btn btn-secondary btn-sm" type="button" onClick={() => setVenueMenuOpen((v) => !v)}>
+              Soy cancha ▾
+            </button>
+            {venueMenuOpen && (
+              <div className="feed-venue-menu card">
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
+                  Publicar mi cancha
+                </button>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
+                  Cargar horarios
+                </button>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
+                  Gestionar disponibilidad
+                </button>
+                <button className="btn btn-secondary btn-sm" type="button" onClick={() => { setVenueMenuOpen(false); navigate('/venues'); }}>
+                  Editar servicios
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="area-filter">
-        {FOOTBALL_TYPES.map((type) => (
-          <button
-            key={type.key}
-            className={`area-pill ${selectedFootballType === type.key ? 'active' : ''}`}
-            onClick={() => setSelectedFootballType(type.key)}
-          >
-            {type.label}
-          </button>
-        ))}
+      <div className="feed-toolbar">
+        <button className="btn btn-secondary" type="button" onClick={() => setFiltersOpen(true)}>
+          Filtros
+        </button>
+        <button className="btn btn-outline" type="button" onClick={() => navigate(user ? '/create-match' : '/login')}>
+          Ver mis opciones para publicar
+        </button>
       </div>
 
-      <div className="area-filter">
-        {REQUEST_TYPES.map((type) => (
-          <button
-            key={type}
-            className={`area-pill ${selectedRequestType === type ? 'active' : ''}`}
-            onClick={() => setSelectedRequestType(type)}
-          >
-            {type}
-          </button>
-        ))}
-      </div>
+      {activeFilterChips.length > 0 && (
+        <div className="feed-active-filters">
+          {activeFilterChips.map((chip) => (
+            <span key={chip} className="badge badge-type">{chip}</span>
+          ))}
+        </div>
+      )}
 
-      <div className="area-filter">
-        {GENDER_FILTERS.map((type) => (
-          <button
-            key={type}
-            className={`area-pill ${selectedGender === type ? 'active' : ''}`}
-            onClick={() => setSelectedGender(type)}
-          >
-            {type}
-          </button>
-        ))}
-      </div>
+      {filtersOpen && (
+        <>
+          <button className="feed-filters-backdrop" type="button" onClick={() => setFiltersOpen(false)} aria-label="Cerrar filtros" />
+          <div className="feed-filters-panel card" role="dialog" aria-modal="true" aria-label="Filtros de publicaciones">
+            <h3>Filtros</h3>
+
+            <div className="feed-filter-section">
+              <div className="feed-filter-label">Tipo de futbol</div>
+              <div className="feed-filter-options">
+                {FOOTBALL_TYPES.filter((f) => f.key !== 'all').map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    className={`area-pill ${draftFootballType === f.key ? 'active' : ''}`}
+                    onClick={() => setDraftFootballType(f.key)}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="feed-filter-section">
+              <div className="feed-filter-label">Tipo de publicacion</div>
+              <div className="feed-filter-options">
+                {REQUEST_TYPE_OPTIONS.filter((t) => t.value !== 'all').map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    className={`area-pill ${draftRequestType === t.value ? 'active' : ''}`}
+                    onClick={() => setDraftRequestType(t.value)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="feed-filter-section">
+              <div className="feed-filter-label">Genero</div>
+              <div className="feed-filter-options">
+                {GENDER_FILTERS.filter((g) => g.value !== 'all').map((g) => (
+                  <button
+                    key={g.key}
+                    type="button"
+                    className={`area-pill ${draftGender === g.value ? 'active' : ''}`}
+                    onClick={() => setDraftGender(g.value)}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="feed-filter-actions">
+              <button className="btn btn-primary" type="button" onClick={applyFilters}>Aplicar filtros</button>
+              <button className="btn btn-secondary" type="button" onClick={clearFilters}>Limpiar filtros</button>
+            </div>
+          </div>
+        </>
+      )}
 
       {isLoading ? (
         <div style={{ display: 'grid', gap: '0.8rem' }}>
@@ -477,13 +625,16 @@ export default function Feed() {
             }}
           >
             <div className="match-card-header">
-              <div className="match-type">
+              <div className="match-type" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.2rem' }}>
+                <h3 className="match-card-title">{getRequestCardTitle(req)}</h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <span className="match-type-icon">{req.kind === 'Match' ? '⚽' : (req.kind === 'Tournament' ? '🏆' : '🛡️')}</span>
                 <span className="match-type-label">
                   {req.kind === 'Match'
                     ? (String(req.raw?.match_kind || '').toLowerCase() === 'futsal' ? 'Partido Futsal' : `Partido F${req.football_type}`)
                     : (req.kind === 'Tournament' ? `Torneo F${req.football_type}` : `Club F${req.football_type || '-'}`)}
                 </span>
+                </div>
               </div>
               <span className="badge badge-type">{req.match_gender || 'mixto'}</span>
             </div>
@@ -515,10 +666,32 @@ export default function Feed() {
                 <span>{formatWhen(req.date, req.time)}</span>
               </div>
               {req.kind === 'Match' ? (
-                <div className="match-info-row">
-                  <span className="info-icon">👥</span>
-                  <span>{buildNeedLabel(req.joined_needed_players, req.needed_players)}{req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}</span>
-                </div>
+                (() => {
+                  const slots = buildSlotsVisual(req.joined_needed_players, req.needed_players);
+                  return (
+                    <div className="match-slots-card">
+                      <div className="match-slots-title">Cupos para completar</div>
+                      <div className="match-slots-track" role="img" aria-label={`${slots.filledSlots} cupos cubiertos de ${slots.totalSlots}`}>
+                        {Array.from({ length: slots.totalSlots }).map((_, idx) => {
+                          const isFilled = idx < slots.filledSlots;
+                          return (
+                            <span
+                              key={`slot-${req.id}-${idx}`}
+                              className={`match-slot ${isFilled ? 'is-filled' : 'is-empty'}`}
+                              title={isFilled ? 'Cupo cubierto' : 'Cupo disponible'}
+                            >
+                              <span className="match-slot-avatar">{isFilled ? '●' : '○'}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="match-slots-text">
+                        {slots.missingLabel}
+                        {req.goalkeepers_needed > 0 ? ` · ${req.goalkeepers_needed} arquero${req.goalkeepers_needed === 2 ? 's' : ''}` : ''}
+                      </div>
+                    </div>
+                  );
+                })()
               ) : req.kind === 'Club' ? (
                 <>
                   <div className="match-info-row">
@@ -611,13 +784,13 @@ export default function Feed() {
 
                   return (
                     <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleJoin(req.id); }}>
-                      Unirme
+                      Quiero sumarme
                     </button>
                   );
                 })()
               ) : req.kind === 'Tournament' ? (
                 <button className="btn btn-primary btn-sm" onClick={(e) => { e.stopPropagation(); handleApplyTournament(req.id); }}>
-                  Postularse
+                  Quiero sumarme
                 </button>
               ) : (
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -643,6 +816,15 @@ export default function Feed() {
           </div>
         ))
       )}
+
+      <button
+        className="feed-fab-extended"
+        type="button"
+        onClick={() => navigate(user ? '/create-match' : '/login')}
+      >
+        <span style={{ fontSize: '1rem', lineHeight: 1 }}>+</span>
+        <span>Me faltan jugadores</span>
+      </button>
     </div>
   );
 }
