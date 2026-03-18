@@ -981,6 +981,20 @@ export const roleRequestsAPI = {
       throw new Error('Tipo de solicitud invalido');
     }
 
+    const requestedMode = desiredRole === 'venue_member' ? 'venue' : 'club';
+    const requirements = await getMyOrgProfileRequirements(session.user.id, requestedMode);
+    if (!requirements.isComplete) {
+      const missing = [];
+      if (!requirements.hasName) missing.push('nombre');
+      if (!requirements.hasPhone) missing.push('telefono');
+      if (!requirements.hasAddress) missing.push('direccion');
+
+      const roleLabel = desiredRole === 'venue_member' ? 'dueño de cancha' : 'club';
+      throw new Error(
+        `Antes de solicitar modo ${roleLabel}, completá ${missing.join(', ')} en tu ficha.`
+      );
+    }
+
     const { data: existing } = await supabase
       .from('role_upgrade_requests')
       .select('id, status')

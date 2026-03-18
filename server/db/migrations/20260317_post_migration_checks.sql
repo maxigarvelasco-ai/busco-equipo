@@ -2,6 +2,7 @@
 -- 1) 20260317_add_club_profiles_and_recruitments.sql
 -- 2) 20260317_role_requests_and_football_expansion.sql
 -- 3) 20260317_birthdate_and_join_notification_cleanup.sql
+-- 4) 20260317_role_request_notifications_and_profile_requirements.sql
 
 -- A) Core tables exist
 select
@@ -57,7 +58,7 @@ select trigger_name, event_object_table
 from information_schema.triggers
 where event_object_schema = 'public'
   and (
-    event_object_table = 'role_upgrade_requests' and trigger_name = 'trg_touch_role_upgrade_requests_updated_at'
+    event_object_table = 'role_upgrade_requests' and trigger_name in ('trg_touch_role_upgrade_requests_updated_at', 'trg_create_role_upgrade_request_notification')
     or
     event_object_table = 'venues' and trigger_name in ('trg_enforce_venue_member_insert', 'trg_enforce_venue_member_owner_update')
   )
@@ -70,6 +71,7 @@ join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public'
   and p.proname in (
     'touch_role_upgrade_requests_updated_at',
+    'create_role_upgrade_request_notification',
     'enforce_venue_member_for_venues',
     'sync_profile_age_from_birth_date',
     'create_match_join_notification'
@@ -118,6 +120,20 @@ with grouped as (
 select count(*) as duplicate_groups
 from grouped
 where c > 1;
+
+-- H3) Role-upgrade sent notifications should exist for created requests
+select
+  count(*) as total_role_requests,
+  count(*) filter (
+    where exists (
+      select 1
+      from public.notifications n
+      where n.type = 'role_upgrade_request_sent'
+        and n.user_id = r.user_id
+        and (n.data ->> 'requestId') = r.id::text
+    )
+  ) as requests_with_notification
+from public.role_upgrade_requests r;
 
 -- I) Quick smoke sample
 select id, name, profile_type, birth_date
